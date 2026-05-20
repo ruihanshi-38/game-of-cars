@@ -11,7 +11,6 @@ class InputHandler {
         });
     }
 
-    // Retorna los controles mapeados para el Jugador 1 (Flechas)
     getPlayer1Input() {
         return {
             forward: this.keys['ArrowUp'] || false,
@@ -21,7 +20,6 @@ class InputHandler {
         };
     }
 
-    // Retorna los controles mapeados para el Jugador 2 (WASD)
     getPlayer2Input() {
         return {
             forward: this.keys['w'] || this.keys['W'] || false,
