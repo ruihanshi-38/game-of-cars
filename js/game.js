@@ -16,31 +16,20 @@ class Game {
             {
                 outer: { x: 50, y: 100, width: 700, height: 450 },
                 inner: { x: 170, y: 220, width: 460, height: 210 },
-                spawn: { x: 400, y: 500, angle: Math.PI / 2 },
-                finishY: 490,
-                waypoints: [
-                    { x: 680, y: 500 }, 
-                    { x: 680, y: 160 }, 
-                    { x: 110, y: 160 }, 
-                    { x: 110, y: 500 }  
-                ]
+                spawn1: { x: 380, y: 510, angle: Math.PI / 2 },
+                spawn2: { x: 440, y: 510, angle: Math.PI / 2 },
+                finishY: 490
             },
             {
                 outer: { x: 40, y: 60, width: 720, height: 500 },
                 inner: { x: 140, y: 160, width: 520, height: 300 },
-                spawn: { x: 400, y: 510, angle: Math.PI / 2 },
-                finishY: 500,
-                waypoints: [
-                    { x: 690, y: 510 },
-                    { x: 690, y: 110 },
-                    { x: 90, y: 110 },
-                    { x: 90, y: 510 }
-                ]
+                spawn1: { x: 380, y: 520, angle: Math.PI / 2 },
+                spawn2: { x: 440, y: 520, angle: Math.PI / 2 },
+                finishY: 500
             }
         ];
         
         this.currentTrackIndex = 0;
-        this.currentLap = 1;
         this.totalLaps = 3;
         this.startTime = null;
         this.bestRecord = null; 
@@ -52,23 +41,28 @@ class Game {
     initTrack() {
         const track = this.tracks[this.currentTrackIndex];
         
+        // Creamos solo dos coches con IDs y colores diferentes
         this.cars = [
-            new Car(track.spawn.x, track.spawn.y, false, "#e74c3c"),       
-            new Car(track.spawn.x - 60, track.spawn.y - 25, true, "#3498db"), 
-            new Car(track.spawn.x + 50, track.spawn.y - 25, true, "#f1c40f"), 
-            new Car(track.spawn.x - 110, track.spawn.y, true, "#9b59b6")     
+            new Car(track.spawn1.x, track.spawn1.y, "#e74c3c", 1), // J1 - Rojo
+            new Car(track.spawn2.x, track.spawn2.y, "#3498db", 2)  // J2 - Azul
         ];
 
         this.cars.forEach(car => {
-            car.angle = track.spawn.angle;
-            car.currentWaypointIndex = 0; 
+            car.angle = track.spawn1.angle;
+            car.currentLap = 1;
+            car.passedCheckpoint = false;
         });
         
-        this.currentLap = 1;
         this.startTime = Date.now();
-        
-        if (this.lapValElement) this.lapValElement.innerText = `${this.currentLap}/${this.totalLaps}`;
+        this.updateUI();
+    }
+
+    updateUI() {
         if (this.circuitValElement) this.circuitValElement.innerText = this.currentTrackIndex + 1;
+        if (this.lapValElement && this.cars[0] && this.cars[1]) {
+            // Mostramos las vueltas de ambos jugadores de forma limpia en el mismo panel
+            this.lapValElement.innerHTML = `J1: ${this.cars[0].currentLap}/${this.totalLaps} | J2: ${this.cars[1].currentLap}/${this.totalLaps}`;
+        }
     }
 
     start() {
@@ -83,9 +77,14 @@ class Game {
 
     update() {
         const track = this.tracks[this.currentTrackIndex];
-        const keys = this.input ? this.input.keys : {};
 
-        this.cars.forEach(car => car.update(keys, track));
+        // Obtenemos los mapas de teclas independientes desde input.js
+        const p1Input = this.input.getPlayer1Input();
+        const p2Input = this.input.getPlayer2Input();
+
+        // Actualizamos cada coche con su respectivo mando de control
+        if (this.cars[0]) this.cars[0].update(p1Input, track);
+        if (this.cars[1]) this.cars[1].update(p2Input, track);
         
         this.processCollisions();
         this.processCarToCarCollisions();
@@ -96,40 +95,41 @@ class Game {
             this.timeValElement.innerText = this.formatTime(elapsed);
         }
 
-        if (this.speedValElement && this.cars[0]) {
-            const kmh = Math.round(Math.abs(this.cars[0].speed) * 28);
-            this.speedValElement.innerText = kmh;
+        if (this.speedValElement && this.cars[0] && this.cars[1]) {
+            const kmhP1 = Math.round(Math.abs(this.cars[0].speed) * 28);
+            const kmhP2 = Math.round(Math.abs(this.cars[1].speed) * 28);
+            this.speedValElement.innerText = `R:${kmhP1} A:${kmhP2}`;
         }
     }
 
     processLapSystem() {
-        const player = this.cars[0];
         const track = this.tracks[this.currentTrackIndex];
-        if (!player) return;
-
-        if (player.y < 300) {
-            player.passedCheckpoint = true;
-        }
-
-        if (player.passedCheckpoint && player.y >= track.finishY && player.y <= track.finishY + 25) {
-            player.passedCheckpoint = false; 
-            
-            if (this.currentLap < this.totalLaps) {
-                this.currentLap++;
-                if (this.lapValElement) this.lapValElement.innerText = `${this.currentLap}/${this.totalLaps}`;
-            } else {
-                const totalTime = Date.now() - this.startTime;
-                
-                if (!this.bestRecord || totalTime < this.bestRecord) {
-                    this.bestRecord = totalTime;
-                    if (this.recordValElement) this.recordValElement.innerText = this.formatTime(this.bestRecord);
-                }
-
-                alert(`¡Victoria! Completaste el Circuito ${this.currentTrackIndex + 1} en ${this.formatTime(totalTime)}`);
-                this.currentTrackIndex = (this.currentTrackIndex + 1) % this.tracks.length;
-                this.initTrack();
+        
+        this.cars.forEach(car => {
+            if (car.y < 300) {
+                car.passedCheckpoint = true;
             }
-        }
+
+            if (car.passedCheckpoint && car.y >= track.finishY && car.y <= track.finishY + 25) {
+                car.passedCheckpoint = false; 
+                
+                if (car.currentLap < this.totalLaps) {
+                    car.currentLap++;
+                    this.updateUI();
+                } else {
+                    const totalTime = Date.now() - this.startTime;
+                    
+                    if (!this.bestRecord || totalTime < this.bestRecord) {
+                        this.bestRecord = totalTime;
+                        if (this.recordValElement) this.recordValElement.innerText = this.formatTime(this.bestRecord);
+                    }
+
+                    alert(`¡Victoria del JUGADOR ${car.id}! Completó el Circuito en ${this.formatTime(totalTime)}`);
+                    this.currentTrackIndex = (this.currentTrackIndex + 1) % this.tracks.length;
+                    this.initTrack();
+                }
+            }
+        });
     }
 
     formatTime(ms) {
@@ -186,30 +186,27 @@ class Game {
     }
 
     processCarToCarCollisions() {
-        for (let i = 0; i < this.cars.length; i++) {
-            for (let j = i + 1; j < this.cars.length; j++) {
-                const carA = this.cars[i];
-                const carB = this.cars[j];
+        if (this.cars.length < 2) return;
+        const carA = this.cars[0];
+        const carB = this.cars[1];
 
-                const dx = carB.x - carA.x;
-                const dy = carB.y - carA.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const minDist = 38; 
+        const dx = carB.x - carA.x;
+        const dy = carB.y - carA.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const minDist = 38; 
 
-                if (distance < minDist) {
-                    carA.bounce();
-                    carB.bounce();
+        if (distance < minDist) {
+            carA.bounce();
+            carB.bounce();
 
-                    const overlap = minDist - distance;
-                    const overlapX = ((dx / (distance || 1)) * overlap) * 0.5;
-                    const overlapY = ((dy / (distance || 1)) * overlap) * 0.5;
+            const overlap = minDist - distance;
+            const overlapX = ((dx / (distance || 1)) * overlap) * 0.5;
+            const overlapY = ((dy / (distance || 1)) * overlap) * 0.5;
 
-                    carA.x -= overlapX;
-                    carA.y -= overlapY;
-                    carB.x += overlapX;
-                    carB.y += overlapY;
-                }
-            }
+            carA.x -= overlapX;
+            carA.y -= overlapY;
+            carB.x += overlapX;
+            carB.y += overlapY;
         }
     }
 
@@ -217,20 +214,25 @@ class Game {
         if (!this.ctx || !this.canvas) return;
         const track = this.tracks[this.currentTrackIndex];
 
+        // Césped
         this.ctx.fillStyle = "#27ae60";
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Asfalto
         this.ctx.fillStyle = "#2c3e50";
         this.ctx.fillRect(track.outer.x, track.outer.y, track.outer.width, track.outer.height);
 
+        // Isla Central
         this.ctx.fillStyle = "#27ae60";
         this.ctx.fillRect(track.inner.x, track.inner.y, track.inner.width, track.inner.height);
 
+        // Líneas blancas perimetrales
         this.ctx.strokeStyle = "#ffffff";
         this.ctx.lineWidth = 4;
         this.ctx.strokeRect(track.outer.x, track.outer.y, track.outer.width, track.outer.height);
         this.ctx.strokeRect(track.inner.x, track.inner.y, track.inner.width, track.inner.height);
 
+        // Línea de Meta a cuadros
         this.ctx.fillStyle = "#ffffff";
         const laneWidth = track.inner.x - track.outer.x;
         for(let offset = 0; offset < laneWidth; offset += 20) {
@@ -242,7 +244,6 @@ class Game {
     }
 }
 
-// Bloque de inicialización seguro con try/catch integrado
 window.addEventListener('load', () => {
     try {
         const game = new Game();
