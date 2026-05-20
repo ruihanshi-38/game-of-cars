@@ -11,16 +11,17 @@ class Car {
         this.vx = 0;
         this.vz = 0;
 
-        // Configuración de físicas arcade
-        this.acceleration = 0.15;
-        this.maxSpeed = 3.5;
-        this.friction = 0.05;
-        this.brakingForce = 0.3;
-        this.driftFactor = 0.85; 
-        this.steerSpeed = 0.05;
+        // --- VELOCIDAD REDUCIDA PARA MAYOR CONTROL ---
+        this.acceleration = 0.06;  // Antes 0.15 (Aceleración más suave)
+        this.maxSpeed = 1.6;      // Antes 3.5 (Velocidad máxima reducida a la mitad)
+        this.friction = 0.03;
+        this.brakingForce = 0.15;
+        this.driftFactor = 0.82;   // Más agarre para no deslizarse sin control
+        this.steerSpeed = 0.045;   // Giro cómodo adaptado a la nueva velocidad
 
         this.currentLap = 1;
         this.passedCheckpoint = false;
+        this.frozen = true; // Empiezan bloqueados por el semáforo
 
         // --- MODELADO DEL COCHE EN 3D ---
         this.mesh = new THREE.Group();
@@ -49,7 +50,7 @@ class Car {
         // Ruedas (4 cilindros)
         const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.4, 12);
         const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-        wheelGeo.rotateZ(Math.PI / 2); // Tumbamos el cilindro para que ruede bien
+        wheelGeo.rotateZ(Math.PI / 2);
 
         const wheelPositions = [
             [-0.9, 0.35, -1.0], // Delantera Izquierda
@@ -64,36 +65,42 @@ class Car {
             this.mesh.add(w);
         });
 
-        // Posicionar el coche completo en el mundo 3D
         this.mesh.position.set(this.x, 0, this.z);
         scene.add(this.mesh);
     }
 
     update(input) {
-        // 1. Aceleración y freno / marcha atrás
+        // Si el semáforo está en rojo, las teclas no hacen nada
+        if (this.frozen) {
+            this.speed = 0;
+            this.vx = 0;
+            this.vz = 0;
+            this.mesh.position.set(this.x, 0, this.z);
+            return;
+        }
+
+        // 1. Aceleración y freno
         if (input && input.forward) {
             this.speed += this.acceleration;
         } else if (input && input.backward) {
             this.speed -= this.brakingForce;
         } else {
-            // Fricción natural cuando no se pulsa nada
             if (this.speed > 0) this.speed -= this.friction;
             if (this.speed < 0) this.speed += this.friction;
             if (Math.abs(this.speed) < this.friction) this.speed = 0;
         }
 
-        // Límites de velocidad máxima
         if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
         if (this.speed < -this.maxSpeed * 0.4) this.speed = -this.maxSpeed * 0.4;
 
-        // 2. Giro del bólido (solo si se está moviendo)
+        // 2. Giro
         if (this.speed !== 0) {
             const dir = this.speed > 0 ? 1 : -1;
             if (input && input.left) this.angle += this.steerSpeed * dir;
             if (input && input.right) this.angle -= this.steerSpeed * dir;
         }
 
-        // 3. Cálculo de vectores (Físicas con derrape controlado)
+        // 3. Vectores
         const forwardX = -Math.sin(this.angle) * this.speed;
         const forwardZ = -Math.cos(this.angle) * this.speed;
 
@@ -103,14 +110,13 @@ class Car {
         this.x += this.vx;
         this.z += this.vz;
 
-        // Sincronizar las físicas con el objeto 3D visible
         this.mesh.position.set(this.x, 0, this.z);
         this.mesh.rotation.y = this.angle;
     }
 
     bounce() {
-        this.speed = -this.speed * 0.4;
-        this.vx = -this.vx * 0.4;
-        this.vz = -this.vz * 0.4;
+        this.speed = -this.speed * 0.3;
+        this.vx = -this.vx * 0.3;
+        this.vz = -this.vz * 0.3;
     }
 }
