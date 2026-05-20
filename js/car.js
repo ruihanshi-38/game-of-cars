@@ -117,11 +117,10 @@ class Car {
         this.vz = -this.vz * 0.3;
     }
 
-    // --- ACCIONES DE HABILIDADES ---
     activateBoost() {
         this.maxSpeed = this.baseMaxSpeed * 2.2; 
         this.speed = this.maxSpeed;
-        this.mesh.children[0].material.color.setHex(0xf1c40f); // Color dorado turbo
+        this.mesh.children[0].material.color.setHex(0xf1c40f); 
 
         setTimeout(() => {
             this.maxSpeed = this.baseMaxSpeed;
@@ -131,7 +130,7 @@ class Car {
 
     activateFreeze() {
         this.frozenBySkill = true;
-        this.mesh.children[0].material.color.setHex(0x34e7e4); // Color azul cian de congelado
+        this.mesh.children[0].material.color.setHex(0x34e7e4); 
 
         setTimeout(() => {
             this.frozenBySkill = false;
@@ -140,7 +139,6 @@ class Car {
     }
 
     spawnSpecialWall() {
-        // --- MURO COMPLETO DE EXTREMO A EXTREMO (Ancho = 20) ---
         const wallGeo = new THREE.BoxGeometry(20, 3, 0.6); 
         const wallMat = new THREE.MeshLambertMaterial({ 
             color: this.color, 
@@ -150,7 +148,7 @@ class Car {
         
         this.myWallMesh = new THREE.Mesh(wallGeo, wallMat);
         this.myWallMesh.position.set(this.x, 1.5, this.z);
-        this.myWallMesh.rotation.y = this.angle; // Se orienta según la dirección del coche
+        this.myWallMesh.rotation.y = this.angle; 
         this.scene.add(this.myWallMesh);
         this.hasPassableWallActive = true;
 
