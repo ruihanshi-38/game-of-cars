@@ -22,7 +22,7 @@ class Game {
         this.totalLaps = 5; 
 
         this.availableSkills = ["BOOST", "SWAP", "FREEZE", "WALL"];
-        this.previousCarPositions = [{ z: 42.5 }, { z: 42.5 }];
+        this.previousCarPositions = [{ z: 42.5 }, { z: 46.0 }];
 
         this.trackPoints = [
             new THREE.Vector3(0, 0, 40),      
@@ -36,6 +36,9 @@ class Game {
             new THREE.Vector3(-45, 0, 30),    
             new THREE.Vector3(-20, 0, 40)     
         ];
+
+        // Ángulo de inclinación calculado para la carretera en la sección de salida
+        this.trackAngle = -0.15; 
 
         this.createTrack();
         this.createTrafficLight(); 
@@ -76,13 +79,13 @@ class Game {
         trackMesh.scale.set(1, 0.01, 1);
         this.scene.add(trackMesh);
 
-        // --- META AJUSTADA DE EXTREMO A EXTREMO (Ancho = 20) ---
-        const metaAncho = 20; // Ocupa los 20 metros totales de la carretera
+        // --- META PERFECTAMENTE ROTADA ADAPTADA AL EXTREMO DE LA CARRETERA ---
+        const metaAncho = 20; 
         const metaLargo = 3;  
         const metaAlto = 0.15; 
 
         this.finishGroup = new THREE.Group();
-        const rows = 12; // Aumentamos divisiones para mantener los cuadros estilizados a lo ancho
+        const rows = 14; 
         const cols = 2; 
         const squareWidth = metaAncho / rows;   
         const squareLength = metaLargo / cols; 
@@ -95,12 +98,16 @@ class Game {
                 const mesh = new THREE.Mesh(geo, mat);
                 
                 const posX = - (metaAncho / 2) + (r * squareWidth) + (squareWidth / 2);
-                const posZ = 40 - (metaLargo / 2) + (c * squareLength) + (squareLength / 2);
+                const posZ = - (metaLargo / 2) + (c * squareLength) + (squareLength / 2);
                 
                 mesh.position.set(posX, metaAlto / 2, posZ);
                 this.finishGroup.add(mesh);
             }
         }
+        
+        // Colocamos el grupo en el centro de control Z=40 y aplicamos la rotación de pista
+        this.finishGroup.position.set(0, 0, 40);
+        this.finishGroup.rotation.y = this.trackAngle;
         this.scene.add(this.finishGroup);
     }
 
@@ -109,30 +116,32 @@ class Game {
         const postGeo = new THREE.CylinderGeometry(0.2, 0.2, 12);
         const structureMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
         
-        // --- SEMÁFORO DE EXTREMO A EXTREMO ---
-        // Postes colocados en -10 y 10 (justo en los extremos exteriores de la pista de ancho 20)
-        const postL = new THREE.Mesh(postGeo, structureMat); postL.position.set(-10, 6, 40);
-        const postR = new THREE.Mesh(postGeo, structureMat); postR.position.set(10, 6, 40);
+        // Postes colocados en los extremos locales del contenedor
+        const postL = new THREE.Mesh(postGeo, structureMat); postL.position.set(-10, 6, 0);
+        const postR = new THREE.Mesh(postGeo, structureMat); postR.position.set(10, 6, 0);
         
-        // La barra superior mide ahora exactamente 20 unidades para conectar ambos postes perfectamente
         const barGeo = new THREE.CylinderGeometry(0.15, 0.15, 20);
-        const bar = new THREE.Mesh(barGeo, structureMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, 12, 40);
+        const bar = new THREE.Mesh(barGeo, structureMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, 12, 0);
 
         this.lightGroup.add(postL, postR, bar);
 
         const boxGeo = new THREE.BoxGeometry(4, 1.5, 1);
         const boxMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-        const box = new THREE.Mesh(boxGeo, boxMat); box.position.set(0, 12, 40);
+        const box = new THREE.Mesh(boxGeo, boxMat); box.position.set(0, 12, 0);
         this.lightGroup.add(box);
 
         const lightGeo = new THREE.SphereGeometry(0.5, 16, 16);
         this.redMat = new THREE.MeshBasicMaterial({ color: 0x550000 });
         this.greenMat = new THREE.MeshBasicMaterial({ color: 0x005500 });
 
-        this.leftLight = new THREE.Mesh(lightGeo, this.redMat); this.leftLight.position.set(-1, 12, 40.6);
-        this.rightLight = new THREE.Mesh(lightGeo, this.greenMat); this.rightLight.position.set(1, 12, 40.6);
+        this.leftLight = new THREE.Mesh(lightGeo, this.redMat); this.leftLight.position.set(-1, 12, 0.6);
+        this.rightLight = new THREE.Mesh(lightGeo, this.greenMat); this.rightLight.position.set(1, 12, 0.6);
 
         this.lightGroup.add(this.leftLight, this.rightLight);
+        
+        // Posicionamos y rotamos el semáforo al mismo ángulo exacto de la meta
+        this.lightGroup.position.set(0, 0, 40);
+        this.lightGroup.rotation.y = this.trackAngle;
         this.scene.add(this.lightGroup);
     }
 
@@ -151,15 +160,17 @@ class Game {
     }
 
     initPlayers() {
-        // Coches saliendo del mismo lugar (Z = 42.5), posicionados en paralelo dentro de la carretera
+        // --- FILA INDIA CENTRAL DE SALIDA ---
+        // Ambos coches salen alineados en el medio del asfalto (X = 0) para evitar colisiones instantáneas.
+        // El coche 1 sale justo detrás de la meta (Z = 42.5) y el coche 2 detrás de él (Z = 46.0).
         this.cars = [
-            new Car(this.scene, -2.5, 42.5, 0xe74c3c, 1), 
-            new Car(this.scene, 2.5, 42.5, 0x3498db, 2)   
+            new Car(this.scene, 0, 42.5, 0xe74c3c, 1), 
+            new Car(this.scene, 0, 46.0, 0x3498db, 2)   
         ];
         this.cars.forEach(car => car.angle = -Math.PI / 2);
 
         this.previousCarPositions[0].z = 42.5;
-        this.previousCarPositions[1].z = 42.5;
+        this.previousCarPositions[1].z = 46.0;
 
         this.assignRandomSkills(this.cars[0]);
         this.assignRandomSkills(this.cars[1]);
@@ -332,8 +343,8 @@ class Game {
 
             if (currentZ < -20) car.passedCheckpoint = true;
 
-            // El rango de detección cubre ahora el ancho total (de -10 a 10 en X)
-            if (Math.abs(car.x) < 10) {
+            // Detección perimetral inteligente considerando la orientación rotada de la meta
+            if (Math.abs(car.x) < 13) {
                 // Sentido correcto
                 if (oldZ >= 40 && currentZ < 40) {
                     if (car.passedCheckpoint) {
@@ -342,8 +353,8 @@ class Game {
                             car.currentLap++;
                         } else {
                             alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} gana tras 5 vueltas.`);
-                            this.cars[0].x = -2.5; this.cars[0].z = 42.5; this.cars[0].currentLap = 1;
-                            this.cars[1].x = 2.5;  this.cars[1].z = 42.5; this.cars[1].currentLap = 1;
+                            this.cars[0].x = 0; this.cars[0].z = 42.5; this.cars[0].currentLap = 1;
+                            this.cars[1].x = 0; this.cars[1].z = 46.0; this.cars[1].currentLap = 1;
                             
                             this.assignRandomSkills(this.cars[0]);
                             this.assignRandomSkills(this.cars[1]);
@@ -352,7 +363,7 @@ class Game {
                     }
                 }
                 
-                // Muro físico inverso (Bloquea tramposos de frente)
+                // Muro anti-dirección contraria
                 if (oldZ <= 40 && currentZ > 40) {
                     car.bounce();
                     car.z = 39.8; 
