@@ -3,7 +3,7 @@ class Car {
         this.id = id;
         this.color = color;
 
-        // Propiedades de movimiento en el plano XZ
+        // Posición y vectores en el plano horizontal (X, Z)
         this.x = x;
         this.z = z;
         this.angle = 0;
@@ -11,103 +11,89 @@ class Car {
         this.vx = 0;
         this.vz = 0;
 
-        // Configuración física arcade refinada
-        this.acceleration = 0.12;
-        this.maxSpeed = 3.2;
-        this.friction = 0.04;
-        this.brakingForce = 0.25;
-        this.driftFactor = 0.88; // Agarre lateral equilibrado
-        this.steerSpeed = 0.045;
+        // Configuración de físicas arcade
+        this.acceleration = 0.15;
+        this.maxSpeed = 3.5;
+        this.friction = 0.05;
+        this.brakingForce = 0.3;
+        this.driftFactor = 0.85; 
+        this.steerSpeed = 0.05;
 
         this.currentLap = 1;
         this.passedCheckpoint = false;
 
-        // --- CONSTRUCCIÓN DEL MODELO 3D ---
+        // --- MODELADO DEL COCHE EN 3D ---
         this.mesh = new THREE.Group();
 
-        // Chasis principal (Cuerpo del coche)
+        // Carrocería principal
         const bodyGeo = new THREE.BoxGeometry(1.6, 0.6, 3.2);
         const bodyMat = new THREE.MeshLambertMaterial({ color: color });
         const body = new THREE.Mesh(bodyGeo, bodyMat);
         body.position.y = 0.4;
         this.mesh.add(body);
 
-        // Cabina/Cristal
-        const cabinGeo = new THREE.BoxGeometry(1.2, 0.5, 1.4);
-        const cabinMat = new THREE.MeshLambertMaterial({ color: 0x1e272e });
+        // Cabina
+        const cabinGeo = new THREE.BoxGeometry(1.1, 0.5, 1.3);
+        const cabinMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
         const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-        cabin.position.set(0, 0.8, -0.2);
+        cabin.position.set(0, 0.8, -0.1);
         this.mesh.add(cabin);
 
-        // Alerón de carreras trasero deportivo
+        // Alerón trasero
         const wingGeo = new THREE.BoxGeometry(2.0, 0.1, 0.5);
         const wingMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
         const wing = new THREE.Mesh(wingGeo, wingMat);
-        wing.position.set(0, 0.9, 1.4);
+        wing.position.set(0, 0.9, 1.3);
         this.mesh.add(wing);
 
-        // Soportes del alerón
-        const supGeo = new THREE.BoxGeometry(0.1, 0.4, 0.1);
-        const supL = new THREE.Mesh(supGeo, wingMat);
-        supL.position.set(-0.6, 0.7, 1.4);
-        const supR = supL.clone();
-        supR.position.x = 0.6;
-        this.mesh.add(supL, supR);
-
-        // Ruedas (4 cilindros en 3D colocados en las esquinas inferiores)
+        // Ruedas (4 cilindros)
         const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.4, 12);
         const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-        // Girar cilindros para que rueden de lado
-        wheelGeo.rotateZ(Math.PI / 2);
+        wheelGeo.rotateZ(Math.PI / 2); // Tumbamos el cilindro para que ruede bien
 
-        this.wheels = [];
-        const positions = [
-            [-0.9, 0.35, -1.0], // Delantera Izq
-            [0.9, 0.35, -1.0],  // Delantera Der
-            [-0.9, 0.35, 1.0],  // Trasera Izq
-            [0.9, 0.35, 1.0]    // Trasera Der
+        const wheelPositions = [
+            [-0.9, 0.35, -1.0], // Delantera Izquierda
+            [0.9, 0.35, -1.0],  // Delantera Derecha
+            [-0.9, 0.35, 1.0],  // Trasera Izquierda
+            [0.9, 0.35, 1.0]    // Trasera Derecha
         ];
 
-        positions.forEach(pos => {
+        wheelPositions.forEach(pos => {
             const w = new THREE.Mesh(wheelGeo, wheelMat);
             w.position.set(pos[0], pos[1], pos[2]);
             this.mesh.add(w);
-            this.wheels.push(w);
         });
 
-        // Añadir el coche completo al mundo 3D
+        // Posicionar el coche completo en el mundo 3D
         this.mesh.position.set(this.x, 0, this.z);
         scene.add(this.mesh);
     }
 
     update(input) {
-        // 1. Aceleración y Freno
+        // 1. Aceleración y freno / marcha atrás
         if (input && input.forward) {
             this.speed += this.acceleration;
         } else if (input && input.backward) {
-            if (this.speed > 0) this.speed -= this.brakingForce;
-            else this.speed -= this.acceleration * 0.6;
+            this.speed -= this.brakingForce;
+        } else {
+            // Fricción natural cuando no se pulsa nada
+            if (this.speed > 0) this.speed -= this.friction;
+            if (this.speed < 0) this.speed += this.friction;
+            if (Math.abs(this.speed) < this.friction) this.speed = 0;
         }
 
-        // Fricción pasiva
-        if (this.speed > 0) this.speed -= this.friction;
-        if (this.speed < 0) this.speed += this.friction;
-        if (Math.abs(this.speed) < this.friction) this.speed = 0;
-
-        // Límites de velocidad
+        // Límites de velocidad máxima
         if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
         if (this.speed < -this.maxSpeed * 0.4) this.speed = -this.maxSpeed * 0.4;
 
-        // 2. Dirección de giro proporcional a la velocidad
+        // 2. Giro del bólido (solo si se está moviendo)
         if (this.speed !== 0) {
-            const factorGiro = Math.min(Math.abs(this.speed) / 1.5, 1.0);
             const dir = this.speed > 0 ? 1 : -1;
-            if (input && input.left) this.angle += this.steerSpeed * factorGiro * dir;
-            if (input && input.right) this.angle -= this.steerSpeed * factorGiro * dir;
+            if (input && input.left) this.angle += this.steerSpeed * dir;
+            if (input && input.right) this.angle -= this.steerSpeed * dir;
         }
 
-        // 3. Descomposición de vectores en el plano 3D (X, Z)
-        // En Three.js el frente del coche apunta hacia -Z por defecto, así que invertimos senos y cosenos
+        // 3. Cálculo de vectores (Físicas con derrape controlado)
         const forwardX = -Math.sin(this.angle) * this.speed;
         const forwardZ = -Math.cos(this.angle) * this.speed;
 
@@ -117,20 +103,14 @@ class Car {
         this.x += this.vx;
         this.z += this.vz;
 
-        // Sincronizar coordenadas con la malla gráfica de Three.js
-        this.mesh.position.x = this.x;
-        this.mesh.position.z = this.z;
+        // Sincronizar las físicas con el objeto 3D visible
+        this.mesh.position.set(this.x, 0, this.z);
         this.mesh.rotation.y = this.angle;
-
-        // Animación simple de rotación de ruedas al avanzar
-        this.wheels.forEach(w => {
-            w.rotation.x -= this.speed * 0.15;
-        });
     }
 
     bounce() {
-        this.speed = -this.speed * 0.3;
-        this.vx = -this.vx * 0.3;
-        this.vz = -this.vz * 0.3;
+        this.speed = -this.speed * 0.4;
+        this.vx = -this.vx * 0.4;
+        this.vz = -this.vz * 0.4;
     }
 }
