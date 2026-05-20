@@ -139,6 +139,7 @@ class Car {
     }
 
     spawnSpecialWall() {
+        // El muro de habilidad también cubrirá el ancho total de 20 unidades
         const wallGeo = new THREE.BoxGeometry(20, 3, 0.6); 
         const wallMat = new THREE.MeshLambertMaterial({ 
             color: this.color, 
