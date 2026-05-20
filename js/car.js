@@ -43,13 +43,13 @@ class Particle {
 }
 
 class Car {
-    constructor(x, y, isAI = false, color = "#e74c3c") {
+    constructor(x, y, color = "#e74c3c", id = 1) {
         this.x = x;
         this.y = y;
         this.width = 26;
         this.height = 50;
-        this.isAI = isAI;
         this.color = color;
+        this.id = id; // Identificador para saber qué jugador es
 
         this.angle = 0;          
         this.travelAngle = 0;    
@@ -58,7 +58,7 @@ class Car {
         this.vy = 0;             
         
         this.acceleration = 0.28; 
-        this.maxSpeed = isAI ? 5.5 + Math.random() * 0.7 : 8.0; 
+        this.maxSpeed = 8.0; // Velocidad idéntica y competitiva para ambos
         this.friction = 0.07;     
         this.brakingForce = 0.5;  
         
@@ -67,23 +67,18 @@ class Car {
         
         this.particles = [];
         this.passedCheckpoint = false;
-        this.currentWaypointIndex = 0;
+        this.currentLap = 1; // Cada coche gestiona su propia vuelta independiente
     }
 
     update(input, currentTrack) {
-        if (!currentTrack) return; // Protección anticaídas si el circuito tarda en cargar
+        if (!currentTrack) return; 
 
-        // 1. Controles
-        if (!this.isAI) {
-            if (input && input.forward) {
-                this.speed += this.acceleration;
-            } else if (input && input.backward) {
-                if (this.speed > 0) this.speed -= this.brakingForce;
-                else this.speed -= this.acceleration * 0.6;
-            }
-        } else {
-            this.speed += this.acceleration * 0.85;
-            this.handleAI(currentTrack);
+        // 1. Controles directos pasados desde el bucle
+        if (input && input.forward) {
+            this.speed += this.acceleration;
+        } else if (input && input.backward) {
+            if (this.speed > 0) this.speed -= this.brakingForce;
+            else this.speed -= this.acceleration * 0.6;
         }
 
         if (this.speed > 0) this.speed -= this.friction;
@@ -93,8 +88,8 @@ class Car {
         if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
         if (this.speed < -this.maxSpeed * 0.4) this.speed = -this.maxSpeed * 0.4;
 
-        // 2. Giro intuitivo
-        if (this.speed !== 0 && !this.isAI) {
+        // 2. Giro proporcional
+        if (this.speed !== 0) {
             const factorGiro = Math.min(Math.abs(this.speed) / 2.0, 1.0); 
             const dir = this.speed > 0 ? 1 : -1;
             
@@ -102,7 +97,7 @@ class Car {
             if (input && input.right) this.angle += this.steerSpeed * factorGiro * dir;
         }
 
-        // 3. Vectores de movimiento
+        // 3. Vectores
         const forwardX = Math.sin(this.angle) * this.speed;
         const forwardY = -Math.cos(this.angle) * this.speed;
 
@@ -112,7 +107,7 @@ class Car {
         this.x += this.vx;
         this.y += this.vy;
 
-        // 4. Sistema de partículas para derrapes mas manejables
+        // 4. Partículas
         this.travelAngle = Math.atan2(this.vx, -this.vy);
         let angleDiff = Math.abs(this.angle - this.travelAngle);
         angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
@@ -130,31 +125,6 @@ class Car {
 
         this.particles.forEach(p => p.update());
         this.particles = this.particles.filter(p => p.alpha > 0);
-    }
-
-    handleAI(currentTrack) {
-        if (!currentTrack || !currentTrack.waypoints) return;
-        
-        const waypoints = currentTrack.waypoints;
-        const target = waypoints[this.currentWaypointIndex];
-        if (!target) return;
-
-        const dx = target.x - this.x;
-        const dy = target.y - this.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < 50) {
-            this.currentWaypointIndex = (this.currentWaypointIndex + 1) % waypoints.length;
-        }
-
-        const targetAngle = Math.atan2(dx, -dy);
-        let angleDiff = targetAngle - this.angle;
-        angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
-
-        const factorGiroIA = Math.min(Math.abs(this.speed) / 2.5, 1.0);
-        if (Math.abs(angleDiff) > 0.02) {
-            this.angle += Math.sign(angleDiff) * this.steerSpeed * 0.85 * factorGiroIA;
-        }
     }
 
     getBounds() {
