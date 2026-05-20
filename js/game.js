@@ -1,254 +1,235 @@
 class Game {
     constructor() {
-        this.canvas = document.getElementById('gameCanvas');
-        if (!this.canvas) return;
-        this.ctx = this.canvas.getContext('2d');
-        
-        this.speedValElement = document.getElementById('speed-val');
-        this.lapValElement = document.getElementById('lap-val');
-        this.timeValElement = document.getElementById('time-val');
-        this.recordValElement = document.getElementById('record-val');
-        this.circuitValElement = document.getElementById('circuit-val');
+        // 1. Configuración de Escena y Renderizador 3D
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x27ae60); // Césped de fondo
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.shadowMap.enabled = true;
+        document.body.appendChild(this.renderer.domElement);
+
+        // 2. Cámara desde arriba (Aérea Isométrica con inclinación cinematográfica)
+        this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+        this.camera.position.set(0, 75, 75);
+        this.camera.lookAt(0, 0, 15);
+
+        // 3. Luces del Mundo
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        this.scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionLight(0xffffff, 0.8);
+        dirLight.position.set(40, 100, 20);
+        this.scene.add(dirLight);
 
         this.input = new InputHandler();
-        
-        this.tracks = [
-            {
-                outer: { x: 50, y: 100, width: 700, height: 450 },
-                inner: { x: 170, y: 220, width: 460, height: 210 },
-                spawn1: { x: 380, y: 510, angle: Math.PI / 2 },
-                spawn2: { x: 440, y: 510, angle: Math.PI / 2 },
-                finishY: 490
-            },
-            {
-                outer: { x: 40, y: 60, width: 720, height: 500 },
-                inner: { x: 140, y: 160, width: 520, height: 300 },
-                spawn1: { x: 380, y: 520, angle: Math.PI / 2 },
-                spawn2: { x: 440, y: 520, angle: Math.PI / 2 },
-                finishY: 500
-            }
-        ];
-        
-        this.currentTrackIndex = 0;
         this.totalLaps = 3;
-        this.startTime = null;
-        this.bestRecord = null; 
 
-        this.initTrack();
+        // --- DISEÑO DEL NUEVO CIRCUITO EXTREMO (Anchura: 18, lleno de curvas) ---
+        // Generamos la carretera como un tubo plano extruido que recorre estos vectores espaciales
+        this.trackPoints = [
+            new THREE.Vector3(0, 0, 40),      // Meta
+            new THREE.Vector3(50, 0, 40),     // Recta principal
+            new THREE.Vector3(80, 0, 20),     // Curva 1 cerrada hacia arriba
+            new THREE.Vector3(80, 0, -40),    // Recta trasera este
+            new THREE.Vector3(50, 0, -60),    // Horquilla Nordeste
+            new THREE.Vector3(10, 0, -30),    // Diagonal interior lenta
+            new THREE.Vector3(-20, 0, -60),   // Chicane agresiva entrada
+            new THREE.Vector3(-40, 0, -30),   // Chicane agresiva salida
+            new THREE.Vector3(-80, 0, -40),   // Curva parabólica Noroeste
+            new THREE.Vector3(-75, 0, 10),    // Recta oeste de aceleración
+            new THREE.Vector3(-40, 0, 10),    // Curva de 90 grados
+            new THREE.Vector3(-40, 0, 40)     // Curva final de entrada a meta
+        ];
+
+        this.create3DTrack();
+        this.initPlayers();
+
+        window.addEventListener('resize', () => this.onWindowResize(), false);
         this.loop = this.loop.bind(this);
     }
 
-    initTrack() {
-        const track = this.tracks[this.currentTrackIndex];
+    create3DTrack() {
+        // Crear una curva suave que una todos nuestros puntos difíciles
+        this.trackCurve = new THREE.CatmullRomCurve3(this.trackPoints, true);
         
-        // Creamos solo dos coches con IDs y colores diferentes
-        this.cars = [
-            new Car(track.spawn1.x, track.spawn1.y, "#e74c3c", 1), // J1 - Rojo
-            new Car(track.spawn2.x, track.spawn2.y, "#3498db", 2)  // J2 - Azul
-        ];
+        // Generar la geometría de la carretera (Carretera extra ancha: radio 9 = 18 unidades de ancho total)
+        const trackGeo = new THREE.TubeGeometry(this.trackCurve, 120, 9, 16, true);
+        const trackMat = new THREE.MeshLambertMaterial({ color: 0x2c3e50 }); // Asfalto Gris
+        const trackMesh = new THREE.Mesh(trackGeo, trackMat);
+        
+        // Aplastamos el tubo en el eje Y para transformarlo en una pista plana y ancha
+        trackMesh.scale.set(1, 0.02, 1);
+        trackMesh.position.y = 0.01;
+        this.scene.add(trackMesh);
 
-        this.cars.forEach(car => {
-            car.angle = track.spawn1.angle;
-            car.currentLap = 1;
-            car.passedCheckpoint = false;
-        });
-        
-        this.startTime = Date.now();
-        this.updateUI();
+        // Línea de Meta (Un plano a cuadros blanco y negro sobre la pista)
+        const finishGeo = new THREE.PlaneGeometry(18, 2);
+        const finishMat = new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+        this.finishLine = new THREE.Mesh(finishGeo, finishMat);
+        this.finishLine.rotation.x = Math.PI / 2;
+        this.finishLine.position.set(0, 0.05, 40); // Ubicada exactamente en el nodo inicial
+        this.scene.add(this.finishLine);
     }
 
-    updateUI() {
-        if (this.circuitValElement) this.circuitValElement.innerText = this.currentTrackIndex + 1;
-        if (this.lapValElement && this.cars[0] && this.cars[1]) {
-            // Mostramos las vueltas de ambos jugadores de forma limpia en el mismo panel
-            this.lapValElement.innerHTML = `J1: ${this.cars[0].currentLap}/${this.totalLaps} | J2: ${this.cars[1].currentLap}/${this.totalLaps}`;
-        }
+    initPlayers() {
+        // Colocamos a los dos coches en paralelo en la línea de salida (Meta a Z = 40)
+        // El coche rojo (J1) y azul (J2) alineados lado a lado en la pista ancha
+        this.cars = [
+            new Car(this.scene, -3, 40, 0xe74c3c, 1), // Jugador 1
+            new Car(this.scene, 3, 40, 0x3498db, 2)   // Jugador 2
+        ];
+
+        // Orientar chasis mirando hacia la recta (Este)
+        this.cars.forEach(car => {
+            car.angle = -Math.PI / 2; 
+        });
     }
 
     start() {
-        requestAnimationFrame(this.loop);
+        this.loop();
     }
 
     loop() {
-        this.update();
-        this.draw();
         requestAnimationFrame(this.loop);
+        this.update();
+        this.renderer.render(this.scene, this.camera);
     }
 
     update() {
-        const track = this.tracks[this.currentTrackIndex];
-
-        // Obtenemos los mapas de teclas independientes desde input.js
         const p1Input = this.input.getPlayer1Input();
         const p2Input = this.input.getPlayer2Input();
 
-        // Actualizamos cada coche con su respectivo mando de control
-        if (this.cars[0]) this.cars[0].update(p1Input, track);
-        if (this.cars[1]) this.cars[1].update(p2Input, track);
-        
-        this.processCollisions();
+        if (this.cars[0]) this.cars[0].update(p1Input);
+        if (this.cars[1]) this.cars[1].update(p2Input);
+
+        this.processTrackCollisions();
         this.processCarToCarCollisions();
         this.processLapSystem();
-        
-        if (this.startTime && this.timeValElement) {
-            const elapsed = Date.now() - this.startTime;
-            this.timeValElement.innerText = this.formatTime(elapsed);
-        }
-
-        if (this.speedValElement && this.cars[0] && this.cars[1]) {
-            const kmhP1 = Math.round(Math.abs(this.cars[0].speed) * 28);
-            const kmhP2 = Math.round(Math.abs(this.cars[1].speed) * 28);
-            this.speedValElement.innerText = `R:${kmhP1} A:${kmhP2}`;
-        }
+        this.updateCameraFollow();
+        this.updateUI();
     }
 
-    processLapSystem() {
-        const track = this.tracks[this.currentTrackIndex];
-        
+    processTrackCollisions() {
+        // En 3D calculamos la distancia más corta de cada coche hacia el eje central de la curva
         this.cars.forEach(car => {
-            if (car.y < 300) {
-                car.passedCheckpoint = true;
-            }
+            const carPosition = new THREE.Vector3(car.x, 0, car.z);
+            // Encuentra el punto más cercano en el centro de la pista
+            const u = this.trackCurve.getUtoTmapping(0, 0); 
+            const closestPoint = this.getClosestPointOnCurve(carPosition, this.trackCurve);
 
-            if (car.passedCheckpoint && car.y >= track.finishY && car.y <= track.finishY + 25) {
-                car.passedCheckpoint = false; 
-                
-                if (car.currentLap < this.totalLaps) {
-                    car.currentLap++;
-                    this.updateUI();
-                } else {
-                    const totalTime = Date.now() - this.startTime;
-                    
-                    if (!this.bestRecord || totalTime < this.bestRecord) {
-                        this.bestRecord = totalTime;
-                        if (this.recordValElement) this.recordValElement.innerText = this.formatTime(this.bestRecord);
-                    }
-
-                    alert(`¡Victoria del JUGADOR ${car.id}! Completó el Circuito en ${this.formatTime(totalTime)}`);
-                    this.currentTrackIndex = (this.currentTrackIndex + 1) % this.tracks.length;
-                    this.initTrack();
-                }
-            }
-        });
-    }
-
-    formatTime(ms) {
-        const minutes = Math.floor(ms / 60000);
-        const seconds = Math.floor((ms % 60000) / 1000);
-        const miliseconds = Math.floor((ms % 1000) / 10);
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${miliseconds.toString().padStart(2, '0')}`;
-    }
-
-    processCollisions() {
-        const track = this.tracks[this.currentTrackIndex];
-        const centerX = track.inner.x + track.inner.width / 2;
-        const centerY = track.inner.y + track.inner.height / 2;
-
-        this.cars.forEach(car => {
-            const bounds = car.getBounds();
-            let hitOuter = false;
-            let hitInner = false;
-
-            for (let vertex of bounds) {
-                if (vertex.x < track.outer.x || 
-                    vertex.x > track.outer.x + track.outer.width ||
-                    vertex.y < track.outer.y || 
-                    vertex.y > track.outer.y + track.outer.height) {
-                    hitOuter = true;
-                    break;
-                }
-
-                if (vertex.x > track.inner.x && 
-                    vertex.x < track.inner.x + track.inner.width &&
-                    vertex.y > track.inner.y && 
-                    vertex.y < track.inner.y + track.inner.height) {
-                    hitInner = true;
-                    break;
-                }
-            }
-
-            if (hitOuter || hitInner) {
+            const distance = carPosition.distanceTo(closestPoint);
+            
+            // Si la distancia al centro es mayor que el radio de la carretera ancha (9), se sale de la pista
+            if (distance > 8.6) {
                 car.bounce();
-
-                const dirX = car.x - centerX;
-                const dirY = car.y - centerY;
-                const length = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
-
-                if (hitInner) {
-                    car.x += (dirX / length) * 7;
-                    car.y += (dirY / length) * 7;
-                } else if (hitOuter) {
-                    car.x -= (dirX / length) * 7;
-                    car.y -= (dirY / length) * 7;
-                }
+                // Lo empujamos de vuelta hacia el asfalto para evitar atascos permanentes
+                const pushDir = new THREE.Vector3().subVectors(closestPoint, carPosition).normalize();
+                car.x += pushDir.x * 0.5;
+                car.z += pushDir.z * 0.5;
             }
         });
+    }
+
+    getClosestPointOnCurve(pos, curve) {
+        // Muestreo rápido para encontrar el punto óptimo del circuito
+        let minPositions = curve.getPoints(100);
+        let closest = minPositions[0];
+        let minDist = pos.distanceTo(closest);
+        
+        for (let i = 1; i < minPositions.length; i++) {
+            let dist = pos.distanceTo(minPositions[i]);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = minPositions[i];
+            }
+        }
+        return closest;
     }
 
     processCarToCarCollisions() {
-        if (this.cars.length < 2) return;
         const carA = this.cars[0];
         const carB = this.cars[1];
+        if (!carA || !carB) return;
 
+        // Distancia euclidiana tridimensional entre mallas
         const dx = carB.x - carA.x;
-        const dy = carB.y - carA.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const minDist = 38; 
+        const dz = carB.z - carA.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+        const minDist = 2.0; // Distancia límite por volumen de mallas
 
         if (distance < minDist) {
             carA.bounce();
             carB.bounce();
 
             const overlap = minDist - distance;
-            const overlapX = ((dx / (distance || 1)) * overlap) * 0.5;
-            const overlapY = ((dy / (distance || 1)) * overlap) * 0.5;
-
-            carA.x -= overlapX;
-            carA.y -= overlapY;
-            carB.x += overlapX;
-            carB.y += overlapY;
+            carA.x -= (dx / (distance || 1)) * overlap * 0.5;
+            carA.z -= (dz / (distance || 1)) * overlap * 0.5;
+            carB.x += (dx / (distance || 1)) * overlap * 0.5;
+            carB.z += (dz / (distance || 1)) * overlap * 0.5;
         }
     }
 
-    draw() {
-        if (!this.ctx || !this.canvas) return;
-        const track = this.tracks[this.currentTrackIndex];
+    processLapSystem() {
+        this.cars.forEach(car => {
+            // Checkpoint intermedio del circuito extremo (Zona norte)
+            if (car.z < -20) {
+                car.passedCheckpoint = true;
+            }
 
-        // Césped
-        this.ctx.fillStyle = "#27ae60";
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            // Cruce de línea de meta (X está cerca de 0, Z está cruzando la línea 40)
+            if (car.passedCheckpoint && car.z >= 38 && car.z <= 42 && Math.abs(car.x) < 10) {
+                car.passedCheckpoint = false;
+                
+                if (car.currentLap < this.totalLaps) {
+                    car.currentLap++;
+                } else {
+                    alert(`¡FIN DE LA CARRERA! Victoria absoluta del JUGADOR ${car.id} en el circuito 3D.`);
+                    car.currentLap = 1;
+                    this.initTrack();
+                }
+            }
+        });
+    }
 
-        // Asfalto
-        this.ctx.fillStyle = "#2c3e50";
-        this.ctx.fillRect(track.outer.x, track.outer.y, track.outer.width, track.outer.height);
+    updateCameraFollow() {
+        // La cámara calcula el punto medio exacto entre el Jugador 1 y el Jugador 2
+        // Esto permite un efecto de cámara dinámica que los sigue a ambos por igual
+        if (!this.cars[0] || !this.cars[1]) return;
+        
+        const midX = (this.cars[0].x + this.cars[1].x) / 2;
+        const midZ = (this.cars[0].z + this.cars[1].z) / 2;
 
-        // Isla Central
-        this.ctx.fillStyle = "#27ae60";
-        this.ctx.fillRect(track.inner.x, track.inner.y, track.inner.width, track.inner.height);
+        // Movimiento suavizado de cámara (Interpolación lineal)
+        this.camera.position.x += (midX - this.camera.position.x) * 0.05;
+        this.camera.position.z += ((midZ + 65) - this.camera.position.z) * 0.05;
+        this.camera.lookAt(midX, 0, midZ);
+    }
 
-        // Líneas blancas perimetrales
-        this.ctx.strokeStyle = "#ffffff";
-        this.ctx.lineWidth = 4;
-        this.ctx.strokeRect(track.outer.x, track.outer.y, track.outer.width, track.outer.height);
-        this.ctx.strokeRect(track.inner.x, track.inner.y, track.inner.width, track.inner.height);
+    updateUI() {
+        const speedEl = document.getElementById('speed-val');
+        const lapEl = document.getElementById('lap-val');
 
-        // Línea de Meta a cuadros
-        this.ctx.fillStyle = "#ffffff";
-        const laneWidth = track.inner.x - track.outer.x;
-        for(let offset = 0; offset < laneWidth; offset += 20) {
-            this.ctx.fillRect(track.outer.x + offset, track.finishY, 10, 10);
-            this.ctx.fillRect(track.outer.x + offset + 10, track.finishY + 10, 10, 10);
+        if (speedEl && this.cars[0] && this.cars[1]) {
+            const s1 = Math.round(Math.abs(this.cars[0].speed) * 60);
+            const s2 = Math.round(Math.abs(this.cars[1].speed) * 60);
+            speedEl.innerText = `J1(Rojo): ${s1} | J2(Azul): ${s2}`;
         }
 
-        this.cars.forEach(car => car.draw(this.ctx));
+        if (lapEl && this.cars[0] && this.cars[1]) {
+            lapEl.innerText = `J1: ${this.cars[0].currentLap}/${this.totalLaps} | J2: ${this.cars[1].currentLap}/${this.totalLaps}`;
+        }
+    }
+
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 }
 
+// Inicializar el juego al cargar la ventana
 window.addEventListener('load', () => {
-    try {
-        const game = new Game();
-        game.start();
-    } catch (error) {
-        console.error("Error al iniciar el juego de carreras:", error);
-    }
+    const game = new Game();
+    game.start();
 });
