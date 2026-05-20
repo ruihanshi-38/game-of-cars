@@ -18,12 +18,10 @@ class Game {
 
         this.input = new InputHandler();
         
-        // --- CONFIGURACIÓN A 5 VUELTAS ---
         this.totalLaps = 5; 
-
         this.availableSkills = ["BOOST", "SWAP", "FREEZE", "WALL"];
-        this.previousCarPositions = [{ z: 42.5 }, { z: 46.0 }];
 
+        // Curva nativa del circuito
         this.trackPoints = [
             new THREE.Vector3(0, 0, 40),      
             new THREE.Vector3(50, 0, 40),     
@@ -36,12 +34,21 @@ class Game {
             new THREE.Vector3(-45, 0, 30),    
             new THREE.Vector3(-20, 0, 40)     
         ];
+        this.trackCurve = new THREE.CatmullRomCurve3(this.trackPoints, true);
 
-        // Ángulo de inclinación calculado para la carretera en la sección de salida
-        this.trackAngle = -0.15; 
+        // --- CÁLCULO GEOMÉTRICO DINÁMICO DE LA META ---
+        // Obtenemos la posición de inicio en la curva (t = 0)
+        this.metaCenter = this.trackCurve.getPointAt(0); 
+        // Obtenemos la dirección (tangente) de la carretera en ese punto
+        const tangent = this.trackCurve.getTangentAt(0).normalize();
+        // Calculamos el ángulo real de rotación Y del terreno
+        this.metaAngle = Math.atan2(-tangent.z, tangent.x) + Math.PI / 2;
+
+        // Historial de posiciones dinámicas inicializado en el punto de salida
+        this.previousCarPositions = [{ x: 0, z: 0 }, { x: 0, z: 0 }];
 
         this.createTrack();
-        this.createTrafficLight(); 
+        this.createDynamicMetaAndLights(); 
         this.initPlayers();
         this.buildCustomUI(); 
         this.startCountdown();    
@@ -72,19 +79,23 @@ class Game {
     }
 
     createTrack() {
-        this.trackCurve = new THREE.CatmullRomCurve3(this.trackPoints, true);
         const trackGeo = new THREE.TubeGeometry(this.trackCurve, 100, 10, 12, true);
         const trackMat = new THREE.MeshLambertMaterial({ color: 0x2c3e50 }); 
         const trackMesh = new THREE.Mesh(trackGeo, trackMat);
         trackMesh.scale.set(1, 0.01, 1);
         this.scene.add(trackMesh);
+    }
 
-        // --- META PERFECTAMENTE ROTADA ADAPTADA AL EXTREMO DE LA CARRETERA ---
+    createDynamicMetaAndLights() {
+        // Contenedor maestro acoplado al centro real de la pista
+        this.metaGroupMaster = new THREE.Group();
+        this.metaGroupMaster.position.copy(this.metaCenter);
+
+        // --- 1. LÍNEA DE META (Ancho de extremo a extremo exacto = 20) ---
         const metaAncho = 20; 
         const metaLargo = 3;  
-        const metaAlto = 0.15; 
+        const metaAlto = 0.05; 
 
-        this.finishGroup = new THREE.Group();
         const rows = 14; 
         const cols = 2; 
         const squareWidth = metaAncho / rows;   
@@ -101,48 +112,40 @@ class Game {
                 const posZ = - (metaLargo / 2) + (c * squareLength) + (squareLength / 2);
                 
                 mesh.position.set(posX, metaAlto / 2, posZ);
-                this.finishGroup.add(mesh);
+                this.metaGroupMaster.add(mesh);
             }
         }
-        
-        // Colocamos el grupo en el centro de control Z=40 y aplicamos la rotación de pista
-        this.finishGroup.position.set(0, 0, 40);
-        this.finishGroup.rotation.y = this.trackAngle;
-        this.scene.add(this.finishGroup);
-    }
 
-    createTrafficLight() {
-        this.lightGroup = new THREE.Group();
-        const postGeo = new THREE.CylinderGeometry(0.2, 0.2, 12);
-        const structureMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        // --- 2. SEMÁFORO ALINEADO AUTOMÁTICAMENTE ---
+        const postGeo = new THREE.CylinderGeometry(0.18, 0.18, 12);
+        const structureMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
         
-        // Postes colocados en los extremos locales del contenedor
+        // Postes en los extremos exactos del asfalto (-10 y 10 relativo al centro)
         const postL = new THREE.Mesh(postGeo, structureMat); postL.position.set(-10, 6, 0);
         const postR = new THREE.Mesh(postGeo, structureMat); postR.position.set(10, 6, 0);
         
-        const barGeo = new THREE.CylinderGeometry(0.15, 0.15, 20);
+        const barGeo = new THREE.CylinderGeometry(0.12, 0.12, 20);
         const bar = new THREE.Mesh(barGeo, structureMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, 12, 0);
 
-        this.lightGroup.add(postL, postR, bar);
+        this.metaGroupMaster.add(postL, postR, bar);
 
-        const boxGeo = new THREE.BoxGeometry(4, 1.5, 1);
+        const boxGeo = new THREE.BoxGeometry(3.5, 1.3, 1);
         const boxMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
         const box = new THREE.Mesh(boxGeo, boxMat); box.position.set(0, 12, 0);
-        this.lightGroup.add(box);
+        this.metaGroupMaster.add(box);
 
-        const lightGeo = new THREE.SphereGeometry(0.5, 16, 16);
+        const lightGeo = new THREE.SphereGeometry(0.45, 16, 16);
         this.redMat = new THREE.MeshBasicMaterial({ color: 0x550000 });
         this.greenMat = new THREE.MeshBasicMaterial({ color: 0x005500 });
 
-        this.leftLight = new THREE.Mesh(lightGeo, this.redMat); this.leftLight.position.set(-1, 12, 0.6);
-        this.rightLight = new THREE.Mesh(lightGeo, this.greenMat); this.rightLight.position.set(1, 12, 0.6);
+        this.leftLight = new THREE.Mesh(lightGeo, this.redMat); this.leftLight.position.set(-0.8, 12, 0.55);
+        this.rightLight = new THREE.Mesh(lightGeo, this.greenMat); this.rightLight.position.set(0.8, 12, 0.55);
 
-        this.lightGroup.add(this.leftLight, this.rightLight);
-        
-        // Posicionamos y rotamos el semáforo al mismo ángulo exacto de la meta
-        this.lightGroup.position.set(0, 0, 40);
-        this.lightGroup.rotation.y = this.trackAngle;
-        this.scene.add(this.lightGroup);
+        this.metaGroupMaster.add(this.leftLight, this.rightLight);
+
+        // Rotamos todo el conjunto maestro al ángulo exacto calculado de la pista
+        this.metaGroupMaster.rotation.y = this.metaAngle;
+        this.scene.add(this.metaGroupMaster);
     }
 
     startCountdown() {
@@ -160,17 +163,23 @@ class Game {
     }
 
     initPlayers() {
-        // --- FILA INDIA CENTRAL DE SALIDA ---
-        // Ambos coches salen alineados en el medio del asfalto (X = 0) para evitar colisiones instantáneas.
-        // El coche 1 sale justo detrás de la meta (Z = 42.5) y el coche 2 detrás de él (Z = 46.0).
-        this.cars = [
-            new Car(this.scene, 0, 42.5, 0xe74c3c, 1), 
-            new Car(this.scene, 0, 46.0, 0x3498db, 2)   
-        ];
-        this.cars.forEach(car => car.angle = -Math.PI / 2);
+        // Usamos la dirección de la meta para posicionar los coches en fila india perfecta
+        const forwardVector = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle);
 
-        this.previousCarPositions[0].z = 42.5;
-        this.previousCarPositions[1].z = 46.0;
+        // Posiciones espaciadas relativas al centro matemático de la meta
+        const p1Pos = this.metaCenter.clone().addScaledVector(forwardVector, -4); // Coche 1 (Rojo) adelante
+        const p2Pos = this.metaCenter.clone().addScaledVector(forwardVector, -8); // Coche 2 (Azul) detrás
+
+        this.cars = [
+            new Car(this.scene, p1Pos.x, p1Pos.z, 0xe74c3c, 1), 
+            new Car(this.scene, p2Pos.x, p2Pos.z, 0x3498db, 2)   
+        ];
+
+        // Orientación inicial alineada con la pista
+        this.cars.forEach(car => car.angle = this.metaAngle + Math.PI);
+
+        this.previousCarPositions[0] = { x: this.cars[0].x, z: this.cars[0].z };
+        this.previousCarPositions[1] = { x: this.cars[1].x, z: this.cars[1].z };
 
         this.assignRandomSkills(this.cars[0]);
         this.assignRandomSkills(this.cars[1]);
@@ -178,13 +187,10 @@ class Game {
 
     assignRandomSkills(car) {
         let pool = [...this.availableSkills];
-        
         let idx1 = Math.floor(Math.random() * pool.length);
         let skill1 = pool.splice(idx1, 1)[0];
-
         let idx2 = Math.floor(Math.random() * pool.length);
         let skill2 = pool.splice(idx2, 1)[0];
-
         car.skills = [skill1, skill2];
     }
 
@@ -227,10 +233,8 @@ class Game {
         if (!c1 || !c2) return;
 
         const tempX = c1.x; const tempZ = c1.z; const tempAngle = c1.angle;
-        
         c1.x = c2.x; c1.z = c2.z; c1.angle = c2.angle;
         c2.x = tempX; c2.z = tempZ; c2.angle = tempAngle;
-
         c1.speed = 0; c2.speed = 0; 
     }
 
@@ -261,8 +265,8 @@ class Game {
         this.cameraFollow();
         this.updateUI();
 
-        if (this.cars[0]) this.previousCarPositions[0].z = this.cars[0].z;
-        if (this.cars[1]) this.previousCarPositions[1].z = this.cars[1].z;
+        if (this.cars[0]) this.previousCarPositions[0] = { x: this.cars[0].x, z: this.cars[0].z };
+        if (this.cars[1]) this.previousCarPositions[1] = { x: this.cars[1].x, z: this.cars[1].z };
     }
 
     processTrackCollisions() {
@@ -337,36 +341,41 @@ class Game {
     }
 
     processLapsAndMetaWalls() {
+        // Comprobación de paso por meta utilizando la matriz de transformación del plano local de la meta
+        const planeNormal = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle);
+
         this.cars.forEach((car, index) => {
-            const oldZ = this.previousCarPositions[index].z;
-            const currentZ = car.z;
+            const oldPos = this.previousCarPositions[index];
+            if (car.z < -20) car.passedCheckpoint = true;
 
-            if (currentZ < -20) car.passedCheckpoint = true;
+            // Calcular distancias relativas con el plano infinito de la meta
+            const oldDist = new THREE.Vector3(oldPos.x, 0, oldPos.z).sub(this.metaCenter).dot(planeNormal);
+            const currentDist = new THREE.Vector3(car.x, 0, car.z).sub(this.metaCenter).dot(planeNormal);
 
-            // Detección perimetral inteligente considerando la orientación rotada de la meta
-            if (Math.abs(car.x) < 13) {
-                // Sentido correcto
-                if (oldZ >= 40 && currentZ < 40) {
+            // Verificar si el vehículo se encuentra dentro del rango de ancho de la carretera (20 unidades)
+            const localPos = new THREE.Vector3(car.x, 0, car.z).sub(this.metaCenter).applyAxisAngle(new THREE.Vector3(0, 1, 0), -this.metaAngle);
+
+            if (Math.abs(localPos.x) < 11) {
+                // Sentido de marcha correcto: cruza el plano de adelante hacia atrás
+                if (oldDist <= 0 && currentDist > 0) {
                     if (car.passedCheckpoint) {
                         car.passedCheckpoint = false;
                         if (car.currentLap < this.totalLaps) {
                             car.currentLap++;
                         } else {
-                            alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} gana tras 5 vueltas.`);
-                            this.cars[0].x = 0; this.cars[0].z = 42.5; this.cars[0].currentLap = 1;
-                            this.cars[1].x = 0; this.cars[1].z = 46.0; this.cars[1].currentLap = 1;
-                            
-                            this.assignRandomSkills(this.cars[0]);
-                            this.assignRandomSkills(this.cars[1]);
+                            alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} gana.`);
+                            this.initPlayers();
                             this.startCountdown();
                         }
                     }
                 }
                 
-                // Muro anti-dirección contraria
-                if (oldZ <= 40 && currentZ > 40) {
+                // Muro físico si intentan ir en dirección contraria
+                if (oldDist >= 0 && currentDist < 0) {
                     car.bounce();
-                    car.z = 39.8; 
+                    const correctSide = this.metaCenter.clone().addScaledVector(planeNormal, 0.5);
+                    car.x = correctSide.x;
+                    car.z = correctSide.z;
                 }
             }
         });
