@@ -12,13 +12,13 @@ class Car {
         this.vx = 0;
         this.vz = 0;
 
-        // --- VELOCIDAD EXTREMADAMENTE LENTA PARA MÁXIMO CONTROL ---
-        this.baseMaxSpeed = 0.5;    // Se redujo de 0.8 a 0.5 (Conducción muy pausada)
+        // Velocidad ultra lenta base
+        this.baseMaxSpeed = 0.5;    
         this.maxSpeed = this.baseMaxSpeed;
         this.acceleration = 0.02;
         this.friction = 0.02;
         this.brakingForce = 0.10;
-        this.driftFactor = 0.75;   // Máximo agarre, casi no derrapa
+        this.driftFactor = 0.75;   
         this.steerSpeed = 0.035;   
 
         this.currentLap = 1;
@@ -139,7 +139,8 @@ class Car {
     }
 
     spawnSpecialWall() {
-        const wallGeo = new THREE.BoxGeometry(6, 3, 0.5);
+        // --- MURO EXTENDIDO DE EXTREMO A EXTREMO (Ancho = 20) ---
+        const wallGeo = new THREE.BoxGeometry(20, 3, 0.6); 
         const wallMat = new THREE.MeshLambertMaterial({ 
             color: this.color, 
             transparent: true, 
