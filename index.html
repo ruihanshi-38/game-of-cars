@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Racer FX - Simulación Avanzada</title>
+    <title>Turbo Racer FX - Campeonato Súperdeportivos</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div id="game-container">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="ui-layer">
-            <div id="speedometer">Velocidad: <span id="speed-val">0</span> km/h</div>
+            <div class="ui-box" id="speedometer">Velocidad: <span id="speed-val">0</span> km/h</div>
+            <div class="ui-box" id="lap-counter">Vuelta: <span id="lap-val">1</span>/3</div>
+            <div class="ui-box" id="timer">Tiempo: <span id="time-val">00:00.00</span></div>
+            <div class="ui-box" id="record">Record: <span id="record-val">--:--.--</span></div>
+            <div class="ui-box" id="circuit-info">Circuito: <span id="circuit-val">1</span></div>
         </div>
     </div>
     
