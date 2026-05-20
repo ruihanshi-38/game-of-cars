@@ -7,9 +7,9 @@ class Particle {
         if (type === "skid") {
             this.alpha = 0.5;
             this.size = 4;
-        } else { // Humo
-            this.vx = -Math.sin(angle) * 1 + (Math.random() - 0.5) * 0.8;
-            this.vy = Math.cos(angle) * 1 + (Math.random() - 0.5) * 0.8;
+        } else { 
+            this.vx = -Math.sin(angle || 0) * 1 + (Math.random() - 0.5) * 0.8;
+            this.vy = Math.cos(angle || 0) * 1 + (Math.random() - 0.5) * 0.8;
             this.alpha = 0.5;
             this.size = Math.random() * 2 + 2;
         }
@@ -22,13 +22,13 @@ class Particle {
             this.alpha -= 0.03;
             this.size += 0.08;
         } else {
-            this.alpha -= 0.02; // Las marcas duran un poco menos para limpiar el circuito
+            this.alpha -= 0.02; 
         }
     }
 
     draw(ctx) {
         ctx.save();
-        ctx.globalAlpha = this.alpha;
+        ctx.globalAlpha = Math.max(0, this.alpha);
         if (this.type === "skid") {
             ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
             ctx.fillRect(this.x - 2, this.y - 2, this.size, this.size);
@@ -57,15 +57,13 @@ class Car {
         this.vx = 0;             
         this.vy = 0;             
         
-        // --- CONFIGURACIÓN ARCADE: CONTROL TOTAL Y RESPUESTA INMEDIATA ---
-        this.acceleration = 0.28; // Aceleración inicial ligeramente más ágil
-        this.maxSpeed = isAI ? 5.5 + Math.random() * 0.7 : 8.0; // Un pelín más lento para reaccionar a tiempo
-        this.friction = 0.07;     // Más fricción del suelo para no patinar infinitamente
-        this.brakingForce = 0.5;  // Freno más reactivo
+        this.acceleration = 0.28; 
+        this.maxSpeed = isAI ? 5.5 + Math.random() * 0.7 : 8.0; 
+        this.friction = 0.07;     
+        this.brakingForce = 0.5;  
         
-        // El secreto de la manejabilidad:
-        this.driftFactor = 0.85;  // BAJADO de 0.92 a 0.85. El coche obedece la dirección del morro casi al instante (Mucho más GRIP).
-        this.steerSpeed = 0.055;  // SUBIDO de 0.045 a 0.055. El volante responde más rápido al pulsar izquierda/derecha.
+        this.driftFactor = 0.85;  
+        this.steerSpeed = 0.055;  
         
         this.particles = [];
         this.passedCheckpoint = false;
@@ -73,11 +71,13 @@ class Car {
     }
 
     update(input, currentTrack) {
-        // 1. Entrada de aceleración/freno
+        if (!currentTrack) return; // Protección anticaídas si el circuito tarda en cargar
+
+        // 1. Controles
         if (!this.isAI) {
-            if (input.forward) {
+            if (input && input.forward) {
                 this.speed += this.acceleration;
-            } else if (input.backward) {
+            } else if (input && input.backward) {
                 if (this.speed > 0) this.speed -= this.brakingForce;
                 else this.speed -= this.acceleration * 0.6;
             }
@@ -86,7 +86,6 @@ class Car {
             this.handleAI(currentTrack);
         }
 
-        // Fricciones lógicas para detener el coche de forma intuitiva
         if (this.speed > 0) this.speed -= this.friction;
         if (this.speed < 0) this.speed += this.friction;
         if (Math.abs(this.speed) < this.friction) this.speed = 0;
@@ -94,35 +93,31 @@ class Car {
         if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
         if (this.speed < -this.maxSpeed * 0.4) this.speed = -this.maxSpeed * 0.4;
 
-        // 2. Control del giro proporcional a la velocidad
-        // Ajustamos la curva de giro para que no pierdas el control a máxima velocidad
-        if (this.speed !== 0 && (!this.isAI)) {
-            // Permite girar bien incluso yendo despacio, pero estabiliza el coche a altas velocidades
+        // 2. Giro intuitivo
+        if (this.speed !== 0 && !this.isAI) {
             const factorGiro = Math.min(Math.abs(this.speed) / 2.0, 1.0); 
             const dir = this.speed > 0 ? 1 : -1;
             
-            if (input.left) this.angle -= this.steerSpeed * factorGiro * dir;
-            if (input.right) this.angle += this.steerSpeed * factorGiro * dir;
+            if (input && input.left) this.angle -= this.steerSpeed * factorGiro * dir;
+            if (input && input.right) this.angle += this.steerSpeed * factorGiro * dir;
         }
 
-        // 3. Unión vectorial del movimiento (Física con agarre mejorado)
+        // 3. Vectores de movimiento
         const forwardX = Math.sin(this.angle) * this.speed;
         const forwardY = -Math.cos(this.angle) * this.speed;
 
-        // Al cambiar el driftFactor, la velocidad lateral (inercia) se alinea rapidísimo con las ruedas
         this.vx = this.vx * this.driftFactor + forwardX * (1 - this.driftFactor);
         this.vy = this.vy * this.driftFactor + forwardY * (1 - this.driftFactor);
 
         this.x += this.vx;
         this.y += this.vy;
 
-        // 4. Activación de derrapes solo en giros verdaderamente extremos
+        // 4. Sistema de partículas para derrapes mas manejables
         this.travelAngle = Math.atan2(this.vx, -this.vy);
         let angleDiff = Math.abs(this.angle - this.travelAngle);
         angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
 
         const actualSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-        // Ahora necesitas forzar más el coche (ángulo > 0.45) para que derrape, haciendo la conducción limpia por defecto
         if (Math.abs(angleDiff) > 0.45 && actualSpeed > 4) {
             const backX = this.x - Math.sin(this.angle) * (this.height / 3);
             const backY = this.y + Math.cos(this.angle) * (this.height / 3);
@@ -138,8 +133,11 @@ class Car {
     }
 
     handleAI(currentTrack) {
+        if (!currentTrack || !currentTrack.waypoints) return;
+        
         const waypoints = currentTrack.waypoints;
         const target = waypoints[this.currentWaypointIndex];
+        if (!target) return;
 
         const dx = target.x - this.x;
         const dy = target.y - this.y;
@@ -169,7 +167,6 @@ class Car {
     }
 
     bounce() {
-        // Un rebote más limpio que te devuelve el control de la dirección de inmediato
         this.speed = -this.speed * 0.2;
         this.vx = -this.vx * 0.2;
         this.vy = -this.vy * 0.2;
