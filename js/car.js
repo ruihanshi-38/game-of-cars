@@ -18,7 +18,7 @@ class Car {
         this.acceleration = 0.02;
         this.friction = 0.02;
         this.brakingForce = 0.10;
-        this.driftFactor = 0.75;   // Máximo agarre, casi no derrapa
+        this.driftFactor = 0.75;   
         this.steerSpeed = 0.035;   
 
         this.currentLap = 1;
@@ -139,7 +139,6 @@ class Car {
     }
 
     spawnSpecialWall() {
-        // El muro de habilidad también cubrirá el ancho total de 20 unidades
         const wallGeo = new THREE.BoxGeometry(20, 3, 0.6); 
         const wallMat = new THREE.MeshLambertMaterial({ 
             color: this.color, 
