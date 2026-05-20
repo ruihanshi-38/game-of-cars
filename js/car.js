@@ -12,20 +12,20 @@ class Car {
         this.vx = 0;
         this.vz = 0;
 
-        // Velocidad ultra lenta base
-        this.baseMaxSpeed = 0.8;    
+        // --- VELOCIDAD EXTREMADAMENTE LENTA PARA MÁXIMO CONTROL ---
+        this.baseMaxSpeed = 0.5;    // Se redujo de 0.8 a 0.5 (Conducción muy pausada)
         this.maxSpeed = this.baseMaxSpeed;
-        this.acceleration = 0.03;
+        this.acceleration = 0.02;
         this.friction = 0.02;
-        this.brakingForce = 0.12;
-        this.driftFactor = 0.80;   
-        this.steerSpeed = 0.04;   
+        this.brakingForce = 0.10;
+        this.driftFactor = 0.75;   // Máximo agarre, casi no derrapa
+        this.steerSpeed = 0.035;   
 
         this.currentLap = 1;
         this.passedCheckpoint = false;
         
-        // --- NUEVO SISTEMA DE HABILIDADES LIMITADAS ---
-        this.skills = []; // Guardará los nombres de las 2 habilidades aleatorias
+        // Sistema de habilidades limitadas
+        this.skills = []; 
         this.frozenBySkill = false;
         this.hasPassableWallActive = false;
         this.myWallMesh = null;
@@ -117,12 +117,10 @@ class Car {
         this.vz = -this.vz * 0.3;
     }
 
-    // --- EJECUCIÓN DE HABILIDADES PROPIAS ---
-    
     activateBoost() {
         this.maxSpeed = this.baseMaxSpeed * 2.2; 
         this.speed = this.maxSpeed;
-        this.mesh.children[0].material.color.setHex(0xf1c40f); // Tinte dorado turbo
+        this.mesh.children[0].material.color.setHex(0xf1c40f); 
 
         setTimeout(() => {
             this.maxSpeed = this.baseMaxSpeed;
@@ -132,7 +130,7 @@ class Car {
 
     activateFreeze() {
         this.frozenBySkill = true;
-        this.mesh.children[0].material.color.setHex(0x34e7e4); // Tinte azul cian congelado
+        this.mesh.children[0].material.color.setHex(0x34e7e4); 
 
         setTimeout(() => {
             this.frozenBySkill = false;
