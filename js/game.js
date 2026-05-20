@@ -217,25 +217,20 @@ class Game {
         if (!this.ctx || !this.canvas) return;
         const track = this.tracks[this.currentTrackIndex];
 
-        // Césped
         this.ctx.fillStyle = "#27ae60";
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Asfalto
         this.ctx.fillStyle = "#2c3e50";
         this.ctx.fillRect(track.outer.x, track.outer.y, track.outer.width, track.outer.height);
 
-        // Isla Central
         this.ctx.fillStyle = "#27ae60";
         this.ctx.fillRect(track.inner.x, track.inner.y, track.inner.width, track.inner.height);
 
-        // Líneas blancas
         this.ctx.strokeStyle = "#ffffff";
         this.ctx.lineWidth = 4;
         this.ctx.strokeRect(track.outer.x, track.outer.y, track.outer.width, track.outer.height);
         this.ctx.strokeRect(track.inner.x, track.inner.y, track.inner.width, track.inner.height);
 
-        // Línea de Meta
         this.ctx.fillStyle = "#ffffff";
         const laneWidth = track.inner.x - track.outer.x;
         for(let offset = 0; offset < laneWidth; offset += 20) {
@@ -247,7 +242,12 @@ class Game {
     }
 }
 
+// Bloque de inicialización seguro con try/catch integrado
 window.addEventListener('load', () => {
-    const game = new Game();
-    game.start();
+    try {
+        const game = new Game();
+        game.start();
+    } catch (error) {
+        console.error("Error al iniciar el juego de carreras:", error);
+    }
 });
