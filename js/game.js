@@ -17,9 +17,10 @@ class Game {
         this.scene.add(sun);
 
         this.input = new InputHandler();
-        this.totalLaps = 3;
+        
+        // --- CONFIGURACIÓN A 5 VUELTAS ---
+        this.totalLaps = 5; 
 
-        // Lista de habilidades disponibles en el juego
         this.availableSkills = ["BOOST", "SWAP", "FREEZE", "WALL"];
 
         this.trackPoints = [
@@ -53,7 +54,7 @@ class Game {
         trackMesh.scale.set(1, 0.01, 1);
         this.scene.add(trackMesh);
 
-        // Línea de meta a cuadros
+        // --- LÍNEA DE META A CUADROS MUY VISIBLE ---
         const rows = 2; const cols = 10; const squareSize = 2;
         this.finishGroup = new THREE.Group();
         for (let r = 0; r < rows; r++) {
@@ -63,7 +64,7 @@ class Game {
                 const geo = new THREE.PlaneGeometry(squareSize, squareSize);
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.rotation.x = Math.PI / 2;
-                mesh.position.set(-10 + (c * squareSize) + 1, 0.02, 39 + (r * squareSize));
+                mesh.position.set(-10 + (c * squareSize) + 1, 0.03, 39 + (r * squareSize)); // Elevado a 0.03 para máxima visibilidad
                 this.finishGroup.add(mesh);
             }
         }
@@ -119,67 +120,55 @@ class Game {
         ];
         this.cars.forEach(car => car.angle = -Math.PI / 2);
 
-        // --- ASIGNACIÓN DE HABILIDADES ALEATORIAS DE UN SOLO USO ---
         this.assignRandomSkills(this.cars[0]);
         this.assignRandomSkills(this.cars[1]);
     }
 
     assignRandomSkills(car) {
-        // Clonamos la lista para extraerlas sin repetir el mismo poder en el mismo coche
         let pool = [...this.availableSkills];
         
-        // Elegimos la primera habilidad
         let idx1 = Math.floor(Math.random() * pool.length);
         let skill1 = pool.splice(idx1, 1)[0];
 
-        // Elegimos la segunda habilidad
         let idx2 = Math.floor(Math.random() * pool.length);
         let skill2 = pool.splice(idx2, 1)[0];
 
         car.skills = [skill1, skill2];
-        console.log(`Jugador ${car.id} recibe habilidades: [${skill1}], [${skill2}]`);
     }
 
     setupAbilityListeners() {
         window.addEventListener('keydown', (e) => {
             if (this.globalMatchFrozen) return;
 
-            // --- JUGADOR 1 (Teclas '1' y '2') ---
+            // --- NUEVOS CONTROLES JUGADOR 1 (Teclas K y L) ---
             if (this.cars[0] && !this.cars[0].frozenBySkill) {
-                if (e.key === '1') this.triggerSkill(this.cars[0], 0);
-                if (e.key === '2') this.triggerSkill(this.cars[0], 1);
+                if (e.key === 'k' || e.key === 'K') this.triggerSkill(this.cars[0], 0);
+                if (e.key === 'l' || e.key === 'L') this.triggerSkill(this.cars[0], 1);
             }
 
-            // --- JUGADOR 2 (Teclas 'q' o 'w') ---
+            // --- NUEVOS CONTROLES JUGADOR 2 (Teclas V y B) ---
             if (this.cars[1] && !this.cars[1].frozenBySkill) {
-                if (e.key === 'q' || e.key === 'Q') this.triggerSkill(this.cars[1], 0);
-                if (e.key === 'w' || e.key === 'W') this.triggerSkill(this.cars[1], 1);
+                if (e.key === 'v' || e.key === 'V') this.triggerSkill(this.cars[1], 0);
+                if (e.key === 'b' || e.key === 'B') this.triggerSkill(this.cars[1], 1);
             }
         });
     }
 
     triggerSkill(car, slotIndex) {
         let skill = car.skills[slotIndex];
-        
-        // Si ya fue usada o está vacía, no hace nada
         if (!skill || skill === "USADO") return;
 
-        console.log(`Jugador ${car.id} usa la habilidad: ${skill}`);
-        
-        // Ejecución de la lógica según la habilidad correspondiente
         if (skill === "BOOST") {
             car.activateBoost();
         } else if (skill === "SWAP") {
             this.swapCarPositions();
         } else if (skill === "FREEZE") {
-            // Congela al rival alterno
             let rival = car.id === 1 ? this.cars[1] : this.cars[0];
             rival.activateFreeze();
         } else if (skill === "WALL") {
             car.spawnSpecialWall();
         }
 
-        // Quemar la habilidad para que no se pueda volver a usar
         car.skills[slotIndex] = "USADO";
     }
 
@@ -295,11 +284,10 @@ class Game {
                 if (car.currentLap < this.totalLaps) {
                     car.currentLap++;
                 } else {
-                    alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} ha ganado.`);
+                    alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} ha ganado tras 5 vueltas.`);
                     this.cars[0].x = -3; this.cars[0].z = 40; this.cars[0].currentLap = 1;
                     this.cars[1].x = 3;  this.cars[1].z = 40; this.cars[1].currentLap = 1;
                     
-                    // Repartir habilidades nuevas para la siguiente revancha
                     this.assignRandomSkills(this.cars[0]);
                     this.assignRandomSkills(this.cars[1]);
                     
@@ -333,19 +321,18 @@ class Game {
         const lapEl = document.getElementById('lap-val');
 
         if (speedEl && this.cars[0] && this.cars[1]) {
-            // Mostrar los nombres de las habilidades asignadas y si están gastadas
             const sk1_a = this.cars[0].skills[0] || "NINGUNA";
             const sk1_b = this.cars[0].skills[1] || "NINGUNA";
             const sk2_a = this.cars[1].skills[0] || "NINGUNA";
             const sk2_b = this.cars[1].skills[1] || "NINGUNA";
 
             speedEl.innerHTML = `
-                <span style="color:#e74c3c">J1 Poderes [Tecla 1, 2]: ${sk1_a} | ${sk1_b}</span> <br/>
-                <span style="color:#3498db">J2 Poderes [Tecla Q, W]: ${sk2_a} | ${sk2_b}</span>
+                <span style="color:#e74c3c; font-weight: bold;">J1 (Rojo) Poderes [Teclas K, L]: ${sk1_a} | ${sk1_b}</span> <br/>
+                <span style="color:#3498db; font-weight: bold;">J2 (Azul) Poderes [Teclas V, B]: ${sk2_a} | ${sk2_b}</span>
             `;
         }
         if (lapEl && this.cars[0] && this.cars[1]) {
-            lapEl.innerText = `VUELTA -> J1: ${this.cars[0].currentLap}/${this.totalLaps} | J2: ${this.cars[1].currentLap}/${this.totalLaps}`;
+            lapEl.innerText = `VUELTAS COMPLETADAS -> J1: ${this.cars[0].currentLap}/${this.totalLaps} | J2: ${this.cars[1].currentLap}/${this.totalLaps}`;
         }
     }
 
