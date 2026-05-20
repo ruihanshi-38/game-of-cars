@@ -6,9 +6,9 @@ class Game {
 
         this.input = new InputHandler();
         
-        // Inicialización en la parrilla de salida
+        // Inicialización en la parrilla de salida (sobre el asfalto)
         this.car = new Car(400, 515); 
-        this.car.angle = Math.PI / 2; // Apuntando al este de la pista
+        this.car.angle = Math.PI / 2; // Apuntando hacia la derecha
 
         // Dimensionamiento de los límites geométricos (Asfalto vs Muros de césped)
         this.trackOuter = { x: 50, y: 50, width: 700, height: 500 };
@@ -38,41 +38,49 @@ class Game {
 
     processCollisions() {
         const bounds = this.car.getBounds();
-        let hit = false;
+        let hitOuter = false;
+        let hitInner = false;
 
         for (let vertex of bounds) {
-            // Condición 1: Traspasar los muros externos de contención
+            // Evaluar si toca el muro exterior
             if (vertex.x < this.trackOuter.x || 
                 vertex.x > this.trackOuter.x + this.trackOuter.width ||
                 vertex.y < this.trackOuter.y || 
                 vertex.y > this.trackOuter.y + this.trackOuter.height) {
-                hit = true;
+                hitOuter = true;
                 break;
             }
 
-            // Condición 2: Invadir la zona interior central
+            // Evaluar si invade la isla central
             if (vertex.x > this.trackInner.x && 
                 vertex.x < this.trackInner.x + this.trackInner.width &&
                 vertex.y > this.trackInner.y && 
                 vertex.y < this.trackInner.y + this.trackInner.height) {
-                hit = true;
+                hitInner = true;
                 break;
             }
         }
 
-        if (hit) {
-            this.car.bounce();
-            
-            // Fuerza de empuje correctora para reubicar el vehículo y evitar atascos en bucle
+        // --- SISTEMA DE EXPULSIÓN DE SEGURIDAD ANTIBUGS ---
+        if (hitOuter || hitInner) {
+            this.car.bounce(); // Hace que el coche rebote físicamente
+
+            // Calculamos la dirección desde el centro de la pantalla hacia el coche
             const centerX = this.canvas.width / 2;
             const centerY = this.canvas.height / 2;
-            const dirX = centerX - this.car.x;
-            const dirY = centerY - this.car.y;
+            const dirX = this.car.x - centerX;
+            const dirY = this.car.y - centerY;
             const length = Math.sqrt(dirX * dirX + dirY * dirY);
-            
-            // Aplica pequeño desplazamiento de escape hacia la pista transitable
-            this.car.x += (dirX / length) * 2.5;
-            this.car.y += (dirY / length) * 2.5;
+
+            if (hitInner) {
+                // Si toca la isla central, lo empujamos con fuerza HACIA AFUERA (dirección asfalto)
+                this.car.x += (dirX / length) * 6;
+                this.car.y += (dirY / length) * 6;
+            } else if (hitOuter) {
+                // Si toca el muro exterior, lo empujamos HACIA ADENTRO (dirección centro)
+                this.car.x -= (dirX / length) * 6;
+                this.car.y -= (dirY / length) * 6;
+            }
         }
     }
 
