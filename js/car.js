@@ -12,19 +12,19 @@ class Car {
         this.vx = 0;
         this.vz = 0;
 
-        // Velocidad ultra lenta base
+        // --- VELOCIDAD EXTREMADAMENTE LENTA PARA MÁXIMO CONTROL ---
         this.baseMaxSpeed = 0.5;    
         this.maxSpeed = this.baseMaxSpeed;
         this.acceleration = 0.02;
         this.friction = 0.02;
         this.brakingForce = 0.10;
-        this.driftFactor = 0.75;   
+        this.driftFactor = 0.75;   // Máximo agarre, casi no derrapa
         this.steerSpeed = 0.035;   
 
         this.currentLap = 1;
         this.passedCheckpoint = false;
         
-        // Sistema de habilidades limitadas
+        // Sistema de habilidades limitadas aleatorias
         this.skills = []; 
         this.frozenBySkill = false;
         this.hasPassableWallActive = false;
@@ -117,10 +117,11 @@ class Car {
         this.vz = -this.vz * 0.3;
     }
 
+    // --- ACCIONES DE HABILIDADES ---
     activateBoost() {
         this.maxSpeed = this.baseMaxSpeed * 2.2; 
         this.speed = this.maxSpeed;
-        this.mesh.children[0].material.color.setHex(0xf1c40f); 
+        this.mesh.children[0].material.color.setHex(0xf1c40f); // Color dorado turbo
 
         setTimeout(() => {
             this.maxSpeed = this.baseMaxSpeed;
@@ -130,7 +131,7 @@ class Car {
 
     activateFreeze() {
         this.frozenBySkill = true;
-        this.mesh.children[0].material.color.setHex(0x34e7e4); 
+        this.mesh.children[0].material.color.setHex(0x34e7e4); // Color azul cian de congelado
 
         setTimeout(() => {
             this.frozenBySkill = false;
@@ -139,7 +140,7 @@ class Car {
     }
 
     spawnSpecialWall() {
-        // --- MURO EXTENDIDO DE EXTREMO A EXTREMO (Ancho = 20) ---
+        // --- MURO COMPLETO DE EXTREMO A EXTREMO (Ancho = 20) ---
         const wallGeo = new THREE.BoxGeometry(20, 3, 0.6); 
         const wallMat = new THREE.MeshLambertMaterial({ 
             color: this.color, 
@@ -149,7 +150,7 @@ class Car {
         
         this.myWallMesh = new THREE.Mesh(wallGeo, wallMat);
         this.myWallMesh.position.set(this.x, 1.5, this.z);
-        this.myWallMesh.rotation.y = this.angle; 
+        this.myWallMesh.rotation.y = this.angle; // Se orienta según la dirección del coche
         this.scene.add(this.myWallMesh);
         this.hasPassableWallActive = true;
 
