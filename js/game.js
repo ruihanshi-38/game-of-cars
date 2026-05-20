@@ -8,8 +8,7 @@ class Game {
         document.body.appendChild(this.renderer.domElement);
 
         this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-        // Altura inicial de la cámara
-        this.camera.position.set(0, 60, 60);
+        this.camera.position.set(0, 50, 50);
 
         const ambient = new THREE.AmbientLight(0xffffff, 0.7);
         this.scene.add(ambient);
@@ -20,7 +19,9 @@ class Game {
         this.input = new InputHandler();
         this.totalLaps = 3;
 
-        // Circuito
+        // Lista de habilidades disponibles en el juego
+        this.availableSkills = ["BOOST", "SWAP", "FREEZE", "WALL"];
+
         this.trackPoints = [
             new THREE.Vector3(0, 0, 40),      
             new THREE.Vector3(50, 0, 40),     
@@ -35,9 +36,10 @@ class Game {
         ];
 
         this.createTrack();
-        this.createTrafficLight(); // Crear estructura del semáforo
+        this.createTrafficLight(); 
         this.initPlayers();
-        this.startCountdown();    // Iniciar secuencia de luces
+        this.startCountdown();    
+        this.setupAbilityListeners(); 
 
         window.addEventListener('resize', () => this.onWindowResize(), false);
         this.loop = this.loop.bind(this);
@@ -45,19 +47,14 @@ class Game {
 
     createTrack() {
         this.trackCurve = new THREE.CatmullRomCurve3(this.trackPoints, true);
-        
-        // Pista ancha (Radio 10)
         const trackGeo = new THREE.TubeGeometry(this.trackCurve, 100, 10, 12, true);
         const trackMat = new THREE.MeshLambertMaterial({ color: 0x2c3e50 }); 
         const trackMesh = new THREE.Mesh(trackGeo, trackMat);
         trackMesh.scale.set(1, 0.01, 1);
         this.scene.add(trackMesh);
 
-        // --- LÍNEA DE META A CUADROS (Blanco y Negro) ---
-        const rows = 2;
-        const cols = 10;
-        const squareSize = 2; 
-        
+        // Línea de meta a cuadros
+        const rows = 2; const cols = 10; const squareSize = 2;
         this.finishGroup = new THREE.Group();
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
@@ -65,9 +62,7 @@ class Game {
                 const mat = new THREE.MeshLambertMaterial({ color: color, side: THREE.DoubleSide });
                 const geo = new THREE.PlaneGeometry(squareSize, squareSize);
                 const mesh = new THREE.Mesh(geo, mat);
-                
                 mesh.rotation.x = Math.PI / 2;
-                // Posicionar baldosas rellenando el ancho de la pista en Z = 40
                 mesh.position.set(-10 + (c * squareSize) + 1, 0.02, 39 + (r * squareSize));
                 this.finishGroup.add(mesh);
             }
@@ -76,68 +71,44 @@ class Game {
     }
 
     createTrafficLight() {
-        // Estructura de postes del semáforo sobre la meta
         this.lightGroup = new THREE.Group();
-
         const postGeo = new THREE.CylinderGeometry(0.2, 0.2, 12);
         const structureMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
         
-        const postL = new THREE.Mesh(postGeo, structureMat);
-        postL.position.set(-11, 6, 40);
-        const postR = new THREE.Mesh(postGeo, structureMat);
-        postR.position.set(11, 6, 40);
-
+        const postL = new THREE.Mesh(postGeo, structureMat); postL.position.set(-11, 6, 40);
+        const postR = new THREE.Mesh(postGeo, structureMat); postR.position.set(11, 6, 40);
         const barGeo = new THREE.CylinderGeometry(0.15, 0.15, 22);
-        const bar = new THREE.Mesh(barGeo, structureMat);
-        bar.rotation.z = Math.PI / 2;
-        bar.position.set(0, 12, 40);
+        const bar = new THREE.Mesh(barGeo, structureMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, 12, 40);
 
         this.lightGroup.add(postL, postR, bar);
 
-        // Caja de luces central
         const boxGeo = new THREE.BoxGeometry(4, 1.5, 1);
         const boxMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-        const box = new THREE.Mesh(boxGeo, boxMat);
-        box.position.set(0, 12, 40);
+        const box = new THREE.Mesh(boxGeo, boxMat); box.position.set(0, 12, 40);
         this.lightGroup.add(box);
 
-        // Focos de Luz (Esferas)
         const lightGeo = new THREE.SphereGeometry(0.5, 16, 16);
-        
-        // Materiales apagados por defecto
         this.redMat = new THREE.MeshBasicMaterial({ color: 0x550000 });
         this.greenMat = new THREE.MeshBasicMaterial({ color: 0x005500 });
 
-        this.leftLight = new THREE.Mesh(lightGeo, this.redMat);
-        this.leftLight.position.set(-1, 12, 40.6); // Orientados hacia la salida
-
-        this.rightLight = new THREE.Mesh(lightGeo, this.greenMat);
-        this.rightLight.position.set(1, 12, 40.6);
+        this.leftLight = new THREE.Mesh(lightGeo, this.redMat); this.leftLight.position.set(-1, 12, 40.6);
+        this.rightLight = new THREE.Mesh(lightGeo, this.greenMat); this.rightLight.position.set(1, 12, 40.6);
 
         this.lightGroup.add(this.leftLight, this.rightLight);
         this.scene.add(this.lightGroup);
     }
 
     startCountdown() {
-        console.log("Semáforo en ROJO. ¡Preparaos!");
-        // Luz roja encendida brillante
         this.redMat.color.setHex(0xff0000); 
         this.greenMat.color.setHex(0x003300);
+        this.globalMatchFrozen = true;
 
         setTimeout(() => {
-            // Cambio a VERDE tras 3 segundos
-            console.log("¡VERDE! ¡YA YA YA!");
-            this.redMat.color.setHex(0x330000); // Apagar rojo
-            this.greenMat.color.setHex(0x00ff00); // Encender verde
+            this.redMat.color.setHex(0x330000); 
+            this.greenMat.color.setHex(0x00ff00); 
+            this.globalMatchFrozen = false;
 
-            // Desbloquear coches
-            this.cars.forEach(car => car.frozen = false);
-
-            // Apagar por completo el semáforo tras unos segundos de carrera
-            setTimeout(() => {
-                this.greenMat.color.setHex(0x005500);
-            }, 3000);
-
+            setTimeout(() => { this.greenMat.color.setHex(0x005500); }, 2000);
         }, 3000);
     }
 
@@ -147,11 +118,84 @@ class Game {
             new Car(this.scene, 3, 40, 0x3498db, 2)   
         ];
         this.cars.forEach(car => car.angle = -Math.PI / 2);
+
+        // --- ASIGNACIÓN DE HABILIDADES ALEATORIAS DE UN SOLO USO ---
+        this.assignRandomSkills(this.cars[0]);
+        this.assignRandomSkills(this.cars[1]);
     }
 
-    start() {
-        this.loop();
+    assignRandomSkills(car) {
+        // Clonamos la lista para extraerlas sin repetir el mismo poder en el mismo coche
+        let pool = [...this.availableSkills];
+        
+        // Elegimos la primera habilidad
+        let idx1 = Math.floor(Math.random() * pool.length);
+        let skill1 = pool.splice(idx1, 1)[0];
+
+        // Elegimos la segunda habilidad
+        let idx2 = Math.floor(Math.random() * pool.length);
+        let skill2 = pool.splice(idx2, 1)[0];
+
+        car.skills = [skill1, skill2];
+        console.log(`Jugador ${car.id} recibe habilidades: [${skill1}], [${skill2}]`);
     }
+
+    setupAbilityListeners() {
+        window.addEventListener('keydown', (e) => {
+            if (this.globalMatchFrozen) return;
+
+            // --- JUGADOR 1 (Teclas '1' y '2') ---
+            if (this.cars[0] && !this.cars[0].frozenBySkill) {
+                if (e.key === '1') this.triggerSkill(this.cars[0], 0);
+                if (e.key === '2') this.triggerSkill(this.cars[0], 1);
+            }
+
+            // --- JUGADOR 2 (Teclas 'q' o 'w') ---
+            if (this.cars[1] && !this.cars[1].frozenBySkill) {
+                if (e.key === 'q' || e.key === 'Q') this.triggerSkill(this.cars[1], 0);
+                if (e.key === 'w' || e.key === 'W') this.triggerSkill(this.cars[1], 1);
+            }
+        });
+    }
+
+    triggerSkill(car, slotIndex) {
+        let skill = car.skills[slotIndex];
+        
+        // Si ya fue usada o está vacía, no hace nada
+        if (!skill || skill === "USADO") return;
+
+        console.log(`Jugador ${car.id} usa la habilidad: ${skill}`);
+        
+        // Ejecución de la lógica según la habilidad correspondiente
+        if (skill === "BOOST") {
+            car.activateBoost();
+        } else if (skill === "SWAP") {
+            this.swapCarPositions();
+        } else if (skill === "FREEZE") {
+            // Congela al rival alterno
+            let rival = car.id === 1 ? this.cars[1] : this.cars[0];
+            rival.activateFreeze();
+        } else if (skill === "WALL") {
+            car.spawnSpecialWall();
+        }
+
+        // Quemar la habilidad para que no se pueda volver a usar
+        car.skills[slotIndex] = "USADO";
+    }
+
+    swapCarPositions() {
+        const c1 = this.cars[0]; const c2 = this.cars[1];
+        if (!c1 || !c2) return;
+
+        const tempX = c1.x; const tempZ = c1.z; const tempAngle = c1.angle;
+        
+        c1.x = c2.x; c1.z = c2.z; c1.angle = c2.angle;
+        c2.x = tempX; c2.z = tempZ; c2.angle = tempAngle;
+
+        c1.speed = 0; c2.speed = 0; 
+    }
+
+    start() { this.loop(); }
 
     loop() {
         requestAnimationFrame(this.loop);
@@ -163,11 +207,17 @@ class Game {
         const p1 = this.input.getPlayer1Input();
         const p2 = this.input.getPlayer2Input();
 
-        if (this.cars[0]) this.cars[0].update(p1);
-        if (this.cars[1]) this.cars[1].update(p2);
+        if (this.globalMatchFrozen) {
+            if (this.cars[0]) this.cars[0].update(null);
+            if (this.cars[1]) this.cars[1].update(null);
+        } else {
+            if (this.cars[0]) this.cars[0].update(p1);
+            if (this.cars[1]) this.cars[1].update(p2);
+        }
 
         this.processTrackCollisions();
         this.processCarCollisions();
+        this.processWallCollisions(); 
         this.processLaps();
         this.cameraFollow();
         this.updateUI();
@@ -175,7 +225,6 @@ class Game {
 
     processTrackCollisions() {
         this.cars.forEach(car => {
-            if (car.frozen) return;
             const carPos = new THREE.Vector3(car.x, 0, car.z);
             const closestPoint = this.getClosestPoint(carPos, this.trackCurve);
             const dist = carPos.distanceTo(closestPoint);
@@ -189,44 +238,56 @@ class Game {
         });
     }
 
+    processWallCollisions() {
+        const c1 = this.cars[0]; const c2 = this.cars[1];
+        
+        if (c1 && c1.hasPassableWallActive && c1.myWallMesh && c2) {
+            const wallPos = c1.myWallMesh.position;
+            const dist = Math.sqrt(Math.pow(c2.x - wallPos.x, 2) + Math.pow(c2.z - wallPos.z, 2));
+            if (dist < 3.2) { 
+                c2.bounce();
+                c2.x -= Math.sin(c2.angle) * -1.5; c2.z -= Math.cos(c2.angle) * -1.5;
+            }
+        }
+
+        if (c2 && c2.hasPassableWallActive && c2.myWallMesh && c1) {
+            const wallPos = c2.myWallMesh.position;
+            const dist = Math.sqrt(Math.pow(c1.x - wallPos.x, 2) + Math.pow(c1.z - wallPos.z, 2));
+            if (dist < 3.2) {
+                c1.bounce();
+                c1.x -= Math.sin(c1.angle) * -1.5; c1.z -= Math.cos(c1.angle) * -1.5;
+            }
+        }
+    }
+
     getClosestPoint(pos, curve) {
         const points = curve.getPoints(100);
-        let closest = points[0];
-        let minDist = pos.distanceTo(closest);
+        let closest = points[0]; let minDist = pos.distanceTo(closest);
         for (let i = 1; i < points.length; i++) {
             let d = pos.distanceTo(points[i]);
-            if (d < minDist) {
-                minDist = d;
-                closest = points[i];
-            }
+            if (d < minDist) { minDist = d; closest = points[i]; }
         }
         return closest;
     }
 
     processCarCollisions() {
-        const c1 = this.cars[0];
-        const c2 = this.cars[1];
-        if (!c1 || !c2 || c1.frozen || c2.frozen) return;
+        const c1 = this.cars[0]; const c2 = this.cars[1];
+        if (!c1 || !c2) return;
 
-        const dx = c2.x - c1.x;
-        const dz = c2.z - c1.z;
+        const dx = c2.x - c1.x; const dz = c2.z - c1.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
         const minDist = 2.2;
 
         if (dist < minDist) {
-            c1.bounce();
-            c2.bounce();
+            c1.bounce(); c2.bounce();
             const push = (minDist - dist) * 0.5;
-            c1.x -= (dx / (dist || 1)) * push;
-            c1.z -= (dz / (dist || 1)) * push;
-            c2.x += (dx / (dist || 1)) * push;
-            c2.z += (dz / (dist || 1)) * push;
+            c1.x -= (dx / (dist || 1)) * push; c1.z -= (dz / (dist || 1)) * push;
+            c2.x += (dx / (dist || 1)) * push; c2.z += (dz / (dist || 1)) * push;
         }
     }
 
     processLaps() {
         this.cars.forEach(car => {
-            if (car.frozen) return;
             if (car.z < -20) car.passedCheckpoint = true;
 
             if (car.passedCheckpoint && car.z >= 38 && car.z <= 42 && Math.abs(car.x) < 12) {
@@ -235,9 +296,13 @@ class Game {
                     car.currentLap++;
                 } else {
                     alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} ha ganado.`);
-                    // Resetear y reiniciar semáforo
-                    this.cars[0].x = -3; this.cars[0].z = 40; this.cars[0].currentLap = 1; this.cars[0].frozen = true;
-                    this.cars[1].x = 3;  this.cars[1].z = 40; this.cars[1].currentLap = 1; this.cars[1].frozen = true;
+                    this.cars[0].x = -3; this.cars[0].z = 40; this.cars[0].currentLap = 1;
+                    this.cars[1].x = 3;  this.cars[1].z = 40; this.cars[1].currentLap = 1;
+                    
+                    // Repartir habilidades nuevas para la siguiente revancha
+                    this.assignRandomSkills(this.cars[0]);
+                    this.assignRandomSkills(this.cars[1]);
+                    
                     this.startCountdown();
                 }
             }
@@ -247,20 +312,15 @@ class Game {
     cameraFollow() {
         if (!this.cars[0] || !this.cars[1]) return;
         
-        // 1. Encontrar el punto medio entre ambos bólidos
         const midX = (this.cars[0].x + this.cars[1].x) / 2;
         const midZ = (this.cars[0].z + this.cars[1].z) / 2;
 
-        // 2. Calcular la distancia actual entre ellos en los dos ejes
         const distX = Math.abs(this.cars[0].x - this.cars[1].x);
         const distZ = Math.abs(this.cars[0].z - this.cars[1].z);
         const maxDist = Math.max(distX, distZ);
 
-        // 3. Modificar la altura (Zoom de la cámara) dinámicamente según la distancia
-        // Mínimo de altura: 45 (cerca), se abre progresivamente hasta donde haga falta
-        const targetHeight = Math.max(45, 35 + (maxDist * 0.8));
+        const targetHeight = Math.max(40, 30 + (maxDist * 1.1));
 
-        // 4. Aplicar suavizado a la posición e interpolación de la cámara
         this.camera.position.x += (midX - this.camera.position.x) * 0.05;
         this.camera.position.y += (targetHeight - this.camera.position.y) * 0.05;
         this.camera.position.z += ((midZ + targetHeight * 0.9) - this.camera.position.z) * 0.05;
@@ -273,12 +333,19 @@ class Game {
         const lapEl = document.getElementById('lap-val');
 
         if (speedEl && this.cars[0] && this.cars[1]) {
-            const s1 = Math.round(Math.abs(this.cars[0].speed) * 110);
-            const s2 = Math.round(Math.abs(this.cars[1].speed) * 110);
-            speedEl.innerText = `J1 (Rojo): ${s1} KM/H | J2 (Azul): ${s2} KM/H`;
+            // Mostrar los nombres de las habilidades asignadas y si están gastadas
+            const sk1_a = this.cars[0].skills[0] || "NINGUNA";
+            const sk1_b = this.cars[0].skills[1] || "NINGUNA";
+            const sk2_a = this.cars[1].skills[0] || "NINGUNA";
+            const sk2_b = this.cars[1].skills[1] || "NINGUNA";
+
+            speedEl.innerHTML = `
+                <span style="color:#e74c3c">J1 Poderes [Tecla 1, 2]: ${sk1_a} | ${sk1_b}</span> <br/>
+                <span style="color:#3498db">J2 Poderes [Tecla Q, W]: ${sk2_a} | ${sk2_b}</span>
+            `;
         }
         if (lapEl && this.cars[0] && this.cars[1]) {
-            lapEl.innerText = `J1: ${this.cars[0].currentLap}/${this.totalLaps} | J2: ${this.cars[1].currentLap}/${this.totalLaps}`;
+            lapEl.innerText = `VUELTA -> J1: ${this.cars[0].currentLap}/${this.totalLaps} | J2: ${this.cars[1].currentLap}/${this.totalLaps}`;
         }
     }
 
@@ -296,7 +363,6 @@ window.addEventListener('load', () => {
             try {
                 const game = new Game();
                 game.start();
-                console.log("¡Todo listo! Motor 3D con cámara inteligente iniciado.");
             } catch (e) {
                 console.error("Fallo de arranque:", e);
             }
