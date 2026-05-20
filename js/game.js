@@ -17,6 +17,8 @@ class Game {
         this.scene.add(sun);
 
         this.input = new InputHandler();
+        
+        // --- CONFIGURACIÓN A 5 VUELTAS ---
         this.totalLaps = 5; 
 
         this.availableSkills = ["BOOST", "SWAP", "FREEZE", "WALL"];
@@ -34,8 +36,8 @@ class Game {
             new THREE.Vector3(-20, 0, 40)     
         ];
 
-        // Guardar posiciones previas para el muro físico de meta unidireccional
-        this.previousCarPositions = [{ z: 40 }, { z: 40 }];
+        // Historial de posiciones Z para calcular el paso de meta unidireccional
+        this.previousCarPositions = [{ z: 41 }, { z: 41 }];
 
         this.createTrack();
         this.createTrafficLight(); 
@@ -55,17 +57,28 @@ class Game {
         trackMesh.scale.set(1, 0.01, 1);
         this.scene.add(trackMesh);
 
-        // Línea de meta visible a cuadros
-        const rows = 2; const cols = 10; const squareSize = 2;
+        // --- LÍNEA DE META 3D CON RELIEVE Y ULTRA VISIBLE ---
+        const metaAncho = 20; 
+        const metaLargo = 3;  
+        const metaAlto = 0.15; 
+
         this.finishGroup = new THREE.Group();
+        const rows = 2; 
+        const cols = 10; 
+        const squareWidth = metaAncho / cols;   
+        const squareLength = metaLargo / rows; 
+
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
-                const color = (r + c) % 2 === 0 ? 0xffffff : 0x111111;
-                const mat = new THREE.MeshLambertMaterial({ color: color, side: THREE.DoubleSide });
-                const geo = new THREE.PlaneGeometry(squareSize, squareSize);
+                const color = (r + c) % 2 === 0 ? 0xffffff : 0x1e272e;
+                const mat = new THREE.MeshLambertMaterial({ color: color });
+                const geo = new THREE.BoxGeometry(squareWidth, metaAlto, squareLength);
                 const mesh = new THREE.Mesh(geo, mat);
-                mesh.rotation.x = Math.PI / 2;
-                mesh.position.set(-10 + (c * squareSize) + 1, 0.03, 39 + (r * squareSize)); 
+                
+                const posX = - (metaAncho / 2) + (c * squareWidth) + (squareWidth / 2);
+                const posZ = 40 - (metaLargo / 2) + (r * squareLength) + (squareLength / 2);
+                
+                mesh.position.set(posX, metaAlto / 2, posZ);
                 this.finishGroup.add(mesh);
             }
         }
@@ -115,6 +128,7 @@ class Game {
     }
 
     initPlayers() {
+        // Inicializar un poco detrás de la meta (Z=41) para evitar activaciones raras en la salida
         this.cars = [
             new Car(this.scene, -3, 41, 0xe74c3c, 1), 
             new Car(this.scene, 3, 41, 0x3498db, 2)   
@@ -144,11 +158,13 @@ class Game {
         window.addEventListener('keydown', (e) => {
             if (this.globalMatchFrozen) return;
 
+            // --- CONTROLES SOLICITADOS JUGADOR 1: K y L ---
             if (this.cars[0] && !this.cars[0].frozenBySkill) {
                 if (e.key === 'k' || e.key === 'K') this.triggerSkill(this.cars[0], 0);
                 if (e.key === 'l' || e.key === 'L') this.triggerSkill(this.cars[0], 1);
             }
 
+            // --- CONTROLES SOLICITADOS JUGADOR 2: V y B ---
             if (this.cars[1] && !this.cars[1].frozenBySkill) {
                 if (e.key === 'v' || e.key === 'V') this.triggerSkill(this.cars[1], 0);
                 if (e.key === 'b' || e.key === 'B') this.triggerSkill(this.cars[1], 1);
@@ -209,11 +225,10 @@ class Game {
         this.processTrackCollisions();
         this.processCarCollisions();
         this.processWallCollisions(); 
-        this.processLapsAndMetaWalls(); // Control unificado de la meta de un solo sentido
+        this.processLapsAndMetaWalls(); 
         this.cameraFollow();
         this.updateUI();
 
-        // Actualizar el historial de posición para la comprobación del frame siguiente
         if (this.cars[0]) this.previousCarPositions[0].z = this.cars[0].z;
         if (this.cars[1]) this.previousCarPositions[1].z = this.cars[1].z;
     }
@@ -236,23 +251,21 @@ class Game {
     processWallCollisions() {
         const c1 = this.cars[0]; const c2 = this.cars[1];
         
-        // Colisión ampliada de extremo a extremo para el muro del jugador 1
+        // Colisión de carril completo para el muro del Jugador 1
         if (c1 && c1.hasPassableWallActive && c1.myWallMesh && c2) {
             const wallPos = c1.myWallMesh.position;
-            // Al ser un muro largo, rotamos el coche relativo al plano del muro para verificar la caja de colisión completa
             const dx = c2.x - wallPos.x;
             const dz = c2.z - wallPos.z;
             const rotatedX = dx * Math.cos(-c1.angle) - dz * Math.sin(-c1.angle);
             const rotatedZ = dx * Math.sin(-c1.angle) + dz * Math.cos(-c1.angle);
 
-            // Caja de colisión extendida (Largo: 20 de extremo a extremo, Ancho: 1)
             if (Math.abs(rotatedX) < 10.5 && Math.abs(rotatedZ) < 1.0) {
                 c2.bounce();
                 c2.x -= Math.sin(c2.angle) * -1.2; c2.z -= Math.cos(c2.angle) * -1.2;
             }
         }
 
-        // Colisión ampliada de extremo a extremo para el muro del jugador 2
+        // Colisión de carril completo para el muro del Jugador 2
         if (c2 && c2.hasPassableWallActive && c2.myWallMesh && c1) {
             const wallPos = c2.myWallMesh.position;
             const dx = c1.x - wallPos.x;
@@ -298,20 +311,20 @@ class Game {
             const oldZ = this.previousCarPositions[index].z;
             const currentZ = car.z;
 
-            // Marcador de punto de control intermedio
+            // Checkpoint intermedio obligatorio para evitar trucos
             if (currentZ < -20) car.passedCheckpoint = true;
 
-            // Rango horizontal de la meta (Ancho de la pista)
+            // Rango de la línea de meta en X
             if (Math.abs(car.x) < 12) {
                 
-                // CASO 1: Cruza desde atrás (De Z > 40 hacia Z < 40) -> SENTIDO CORRECTO
+                // CASO A: Pasa por detrás (De Z > 40 hacia Z < 40) -> DIRECCIÓN CORRECTA
                 if (oldZ >= 40 && currentZ < 40) {
                     if (car.passedCheckpoint) {
                         car.passedCheckpoint = false;
                         if (car.currentLap < this.totalLaps) {
                             car.currentLap++;
                         } else {
-                            alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} ha ganado tras 5 vueltas.`);
+                            alert(`¡FIN DE LA CARRERA! El Jugador ${car.id} gana tras 5 vueltas.`);
                             this.cars[0].x = -3; this.cars[0].z = 41; this.cars[0].currentLap = 1;
                             this.cars[1].x = 3;  this.cars[1].z = 41; this.cars[1].currentLap = 1;
                             
@@ -322,10 +335,10 @@ class Game {
                     }
                 }
                 
-                // CASO 2: Intenta entrar por delante (De Z < 40 hacia Z > 40) -> SENTIDO PROHIBIDO (MURO ACTIVO)
+                // CASO B: Intenta pasar por delante (De Z < 40 hacia Z > 40) -> BLOQUEO DE MURO
                 if (oldZ <= 40 && currentZ > 40) {
                     car.bounce();
-                    car.z = 39.8; // Empuja el coche hacia atrás impidiéndole cruzar
+                    car.z = 39.8; // Lo repele para evitar que cruce al revés
                 }
             }
         });
@@ -361,8 +374,8 @@ class Game {
             const sk2_b = this.cars[1].skills[1] || "NINGUNA";
 
             speedEl.innerHTML = `
-                <span style="color:#e74c3c; font-weight: bold;">J1 (Rojo) Poderes [Teclas K, L]: ${sk1_a} | ${sk1_b}</span> <br/>
-                <span style="color:#3498db; font-weight: bold;">J2 (Azul) Poderes [Teclas V, B]: ${sk2_a} | ${sk2_b}</span>
+                <span style="color:#e74c3c; font-weight: bold;">J1 (Rojo) Poderes [K, L]: ${sk1_a} | ${sk1_b}</span> <br/>
+                <span style="color:#3498db; font-weight: bold;">J2 (Azul) Poderes [V, B]: ${sk2_a} | ${sk2_b}</span>
             `;
         }
         if (lapEl && this.cars[0] && this.cars[1]) {
