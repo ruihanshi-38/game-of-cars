@@ -38,20 +38,21 @@ class Car {
         this.angle = 0;
         
         this.acceleration = 0.22;
-        this.maxSpeed = isAI ? 6.2 + Math.random() * 1.0 : 8.5; 
+        this.maxSpeed = isAI ? 5.5 + Math.random() * 1.2 : 8.5; // Ajuste competitivo
         this.friction = 0.06;
         
         this.particles = [];
-        
-        // Control de paso por meta del jugador
         this.passedCheckpoint = false; 
+
+        // Variables exclusivas de la IA inteligente
+        this.currentWaypointIndex = 0;
     }
 
-    // Pasamos el 'currentTrack' en el update para que la IA se adapte al circuito activo
     update(input, currentTrack) {
         let isTurning = false;
 
         if (!this.isAI) {
+            // --- CONTROL DEL JUGADOR ---
             if (input.forward) this.speed += this.acceleration;
             if (input.backward) this.speed -= this.acceleration;
 
@@ -62,36 +63,50 @@ class Car {
                 if (input.right) { this.angle += turnRatio * directionMultiplier; isTurning = true; }
             }
         } else {
-            this.speed += this.acceleration * 0.82;
+            // --- NUEVO CEREBRO DE IA POR WAYPOINTS ---
+            this.speed += this.acceleration * 0.85;
 
-            // La IA calcula su trayectoria basándose en el centro de la isla interior del circuito actual
-            const centerX = currentTrack.inner.x + currentTrack.inner.width / 2;
-            const centerY = currentTrack.inner.y + currentTrack.inner.height / 2;
-            const vectorX = this.x - centerX;
-            const vectorY = this.y - centerY;
-            
-            const targetAngle = Math.atan2(-vectorX, vectorY);
+            const waypoints = currentTrack.waypoints;
+            const target = waypoints[this.currentWaypointIndex];
+
+            // Calcular distancia al objetivo actual
+            const dx = target.x - this.x;
+            const dy = target.y - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Si está lo suficientemente cerca del punto, pasa al siguiente
+            if (distance < 50) {
+                this.currentWaypointIndex = (this.currentWaypointIndex + 1) % waypoints.length;
+            }
+
+            // Calcular el ángulo matemático hacia el punto de ruta
+            const targetAngle = Math.atan2(dx, -dy);
             let angleDiff = targetAngle - this.angle;
             angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
 
-            const aiTurnSpeed = 0.038;
+            // Velocidad de giro adaptable
+            const aiTurnSpeed = 0.045;
             if (Math.abs(angleDiff) > 0.02) {
                 this.angle += Math.sign(angleDiff) * aiTurnSpeed;
                 isTurning = true;
             }
         }
 
+        // Límites de velocidad globales
         if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
         if (this.speed < -this.maxSpeed / 2) this.speed = -this.maxSpeed / 2;
 
+        // Fricciones
         if (this.speed > 0) this.speed -= this.friction;
         if (this.speed < 0) this.speed += this.friction;
         if (Math.abs(this.speed) < this.friction) this.speed = 0;
 
+        // Movimiento vectorial
         this.x += Math.sin(this.angle) * this.speed;
         this.y -= Math.cos(this.angle) * this.speed;
 
-        if (isTurning && Math.abs(this.speed) > this.maxSpeed * 0.5) {
+        // Humo de neumáticos
+        if (isTurning && Math.abs(this.speed) > this.maxSpeed * 0.45) {
             const backX = this.x - Math.sin(this.angle) * (this.height / 2);
             const backY = this.y + Math.cos(this.angle) * (this.height / 2);
             this.particles.push(new Particle(backX, backY, this.angle));
@@ -111,7 +126,7 @@ class Car {
     }
 
     bounce() {
-        this.speed = -this.speed * 0.35; 
+        this.speed = -this.speed * 0.4; 
     }
 
     draw(ctx) {
