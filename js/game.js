@@ -153,24 +153,25 @@ class Game {
     }
 
     initPlayers() {
-        // Obtenemos los vectores de dirección (hacia adelante) y lateral (hacia la derecha) de la meta
-        const forwardVector = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle);
-        const rightVector = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle);
+        // Dirección hacia adelante de la pista
+        const forwardVector = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle).normalize();
+        
+        // Vector lateral REAL (perpendicular al avance en el eje X-Z global)
+        const sideVector = new THREE.Vector3(-forwardVector.z, 0, forwardVector.x).normalize();
 
-        // --- SALIDA EN PARALELO ALINEADA ---
-        // Nos movemos un poco hacia atrás de la línea de meta (-5 unidades) 
-        const baseLine = this.metaCenter.clone().addScaledVector(forwardVector, -5);
+        // Retrocedemos 5 unidades de la línea de meta para dar espacio de salida
+        const startLineCenter = this.metaCenter.clone().addScaledVector(forwardVector, -5);
 
-        // Desplazamos lateralmente: J1 a la izquierda (-2.5 unidades) y J2 a la derecha (+2.5 unidades)
-        const p1Pos = baseLine.clone().addScaledVector(rightVector, -2.5);
-        const p2Pos = baseLine.clone().addScaledVector(rightVector, 2.5);
+        // Desplazamiento lateral exacto en paralelo: J1 a la izquierda (-2.5) y J2 a la derecha (+2.5)
+        const p1Pos = startLineCenter.clone().addScaledVector(sideVector, -2.5);
+        const p2Pos = startLineCenter.clone().addScaledVector(sideVector, 2.5);
 
         this.cars = [
             new Car(this.scene, p1Pos.x, p1Pos.z, 0xe74c3c, 1), 
             new Car(this.scene, p2Pos.x, p2Pos.z, 0x3498db, 2)   
         ];
 
-        // Orientación inicial alineada exactamente con la pista
+        // Orientación inicial alineada con la pista
         this.cars.forEach(car => car.angle = this.metaAngle + Math.PI);
 
         this.previousCarPositions[0] = { x: this.cars[0].x, z: this.cars[0].z };
@@ -199,7 +200,7 @@ class Game {
                 if (e.key === 'l' || e.key === 'L') this.triggerSkill(this.cars[0], 1);
             }
 
-            // Jugador 2: Teclas 1 y 2 (Alfanuméricas superiores)
+            // Jugador 2: Teclas 1 y 2 (Alfanuméricas de arriba)
             if (this.cars[1] && !this.cars[1].frozenBySkill) {
                 if (e.key === '1') this.triggerSkill(this.cars[1], 0);
                 if (e.key === '2') this.triggerSkill(this.cars[1], 1);
