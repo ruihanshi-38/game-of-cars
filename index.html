@@ -3,23 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Turbo Racer FX - Campeonato Súperdeportivos</title>
+    <title>Game of Cars - Simulador 2D</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
     <div id="game-container">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="ui-layer">
-            <div class="ui-box" id="speedometer">Velocidad: <span id="speed-val">0</span> km/h</div>
-            <div class="ui-box" id="lap-counter">Vuelta: <span id="lap-val">1</span>/3</div>
-            <div class="ui-box" id="timer">Tiempo: <span id="time-val">00:00.00</span></div>
-            <div class="ui-box" id="record">Record: <span id="record-val">--:--.--</span></div>
-            <div class="ui-box" id="circuit-info">Circuito: <span id="circuit-val">1</span></div>
+        <div id="ui-panel">
+            <div class="ui-box speed"><span class="title">VELOCIDAD:</span> <span id="speed-val">0</span> <span class="unit">KM/H</span></div>
+            <div class="ui-box lap"><span class="title">VUELTA:</span> <span id="lap-val">1/3</span></div>
+            <div class="ui-box time"><span class="title">TIEMPO:</span> <span id="time-val">00:00.00</span></div>
+            <div class="ui-box record"><span class="title">RECORD:</span> <span id="record-val">--:--.--</span></div>
+            <div class="ui-box circuit"><span class="title">CIRCUITO:</span> <span id="circuit-val">1</span></div>
         </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
     </div>
-    
+
     <script src="js/input.js"></script>
     <script src="js/car.js"></script>
     <script src="js/game.js"></script>
+
 </body>
 </html>
