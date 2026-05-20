@@ -31,16 +31,25 @@ canvas {
     position: absolute;
     top: 20px;
     left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
     pointer-events: none;
 }
 
-#speedometer {
+.ui-box {
     background: rgba(26, 26, 26, 0.85);
-    padding: 12px 24px;
+    padding: 10px 18px;
     border-radius: 4px;
-    font-size: 1.3rem;
+    font-size: 1rem;
     font-weight: bold;
-    border-left: 5px solid #e74c3c;
+    border-left: 4px solid #e74c3c;
     letter-spacing: 1px;
     text-transform: uppercase;
 }
+
+#speedometer { border-left-color: #e74c3c; }
+#lap-counter { border-left-color: #3498db; }
+#timer { border-left-color: #f1c40f; }
+#record { border-left-color: #2ecc71; }
+#circuit-info { border-left-color: #9b59b6; }
