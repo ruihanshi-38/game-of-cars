@@ -22,9 +22,7 @@ class Game {
         this.totalLaps = 5; 
 
         this.availableSkills = ["BOOST", "SWAP", "FREEZE", "WALL"];
-        
-        // La meta física se calcula en Z = 40
-        this.previousCarPositions = [{ z: 41 }, { z: 41 }];
+        this.previousCarPositions = [{ z: 42.5 }, { z: 42.5 }];
 
         this.trackPoints = [
             new THREE.Vector3(0, 0, 40),      
@@ -78,13 +76,13 @@ class Game {
         trackMesh.scale.set(1, 0.01, 1);
         this.scene.add(trackMesh);
 
-        // --- NUEVA LÍNEA DE META VERTICAL PERFECTAMENTE ALINEADA ---
-        const metaAncho = 20; // Ancho del carril
-        const metaLargo = 3;  // Longitud de la banda de cuadros
+        // --- META AJUSTADA DE EXTREMO A EXTREMO (Ancho = 20) ---
+        const metaAncho = 20; // Ocupa los 20 metros totales de la carretera
+        const metaLargo = 3;  
         const metaAlto = 0.15; 
 
         this.finishGroup = new THREE.Group();
-        const rows = 10; // Invertimos filas y columnas para que el patrón sea vertical
+        const rows = 12; // Aumentamos divisiones para mantener los cuadros estilizados a lo ancho
         const cols = 2; 
         const squareWidth = metaAncho / rows;   
         const squareLength = metaLargo / cols; 
@@ -96,7 +94,6 @@ class Game {
                 const geo = new THREE.BoxGeometry(squareWidth, metaAlto, squareLength);
                 const mesh = new THREE.Mesh(geo, mat);
                 
-                // Distribución matemática en Z y X para rotar la línea a posición vertical
                 const posX = - (metaAncho / 2) + (r * squareWidth) + (squareWidth / 2);
                 const posZ = 40 - (metaLargo / 2) + (c * squareLength) + (squareLength / 2);
                 
@@ -112,9 +109,12 @@ class Game {
         const postGeo = new THREE.CylinderGeometry(0.2, 0.2, 12);
         const structureMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
         
-        // Postes colocados exactamente sobre los extremos de la meta (Z = 40)
+        // --- SEMÁFORO DE EXTREMO A EXTREMO ---
+        // Postes colocados en -10 y 10 (justo en los extremos exteriores de la pista de ancho 20)
         const postL = new THREE.Mesh(postGeo, structureMat); postL.position.set(-10, 6, 40);
         const postR = new THREE.Mesh(postGeo, structureMat); postR.position.set(10, 6, 40);
+        
+        // La barra superior mide ahora exactamente 20 unidades para conectar ambos postes perfectamente
         const barGeo = new THREE.CylinderGeometry(0.15, 0.15, 20);
         const bar = new THREE.Mesh(barGeo, structureMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, 12, 40);
 
@@ -151,8 +151,7 @@ class Game {
     }
 
     initPlayers() {
-        // --- LOS COCHES SALEN EXACTAMENTE DESDE LA MISMA LÍNEA DE SALIDA (Z = 42.5) ---
-        // Se encuentran en paralelo, uno a la izquierda (-2.5) y otro a la derecha (2.5)
+        // Coches saliendo del mismo lugar (Z = 42.5), posicionados en paralelo dentro de la carretera
         this.cars = [
             new Car(this.scene, -2.5, 42.5, 0xe74c3c, 1), 
             new Car(this.scene, 2.5, 42.5, 0x3498db, 2)   
@@ -333,8 +332,9 @@ class Game {
 
             if (currentZ < -20) car.passedCheckpoint = true;
 
-            if (Math.abs(car.x) < 12) {
-                // Sentido correcto (De atrás adelante: cruza Z = 40 descendiendo)
+            // El rango de detección cubre ahora el ancho total (de -10 a 10 en X)
+            if (Math.abs(car.x) < 10) {
+                // Sentido correcto
                 if (oldZ >= 40 && currentZ < 40) {
                     if (car.passedCheckpoint) {
                         car.passedCheckpoint = false;
@@ -352,7 +352,7 @@ class Game {
                     }
                 }
                 
-                // Sentido contrario (Bloqueo de muro si intenta cruzar subiendo Z)
+                // Muro físico inverso (Bloquea tramposos de frente)
                 if (oldZ <= 40 && currentZ > 40) {
                     car.bounce();
                     car.z = 39.8; 
