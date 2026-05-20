@@ -114,8 +114,6 @@ class Game {
         // En 3D calculamos la distancia más corta de cada coche hacia el eje central de la curva
         this.cars.forEach(car => {
             const carPosition = new THREE.Vector3(car.x, 0, car.z);
-            // Encuentra el punto más cercano en el centro de la pista
-            const u = this.trackCurve.getUtoTmapping(0, 0); 
             const closestPoint = this.getClosestPointOnCurve(carPosition, this.trackCurve);
 
             const distance = carPosition.distanceTo(closestPoint);
@@ -185,8 +183,10 @@ class Game {
                     car.currentLap++;
                 } else {
                     alert(`¡FIN DE LA CARRERA! Victoria absoluta del JUGADOR ${car.id} en el circuito 3D.`);
-                    car.currentLap = 1;
-                    this.initTrack();
+                    
+                    // Reiniciar posiciones tras la victoria
+                    this.cars[0].x = -3; this.cars[0].z = 40; this.cars[0].speed = 0; this.cars[0].angle = -Math.PI / 2; this.cars[0].currentLap = 1;
+                    this.cars[1].x = 3;  this.cars[1].z = 40; this.cars[1].speed = 0; this.cars[1].angle = -Math.PI / 2; this.cars[1].currentLap = 1;
                 }
             }
         });
@@ -228,8 +228,21 @@ class Game {
     }
 }
 
-// Inicializar el juego al cargar la ventana
+// Inicialización inteligente y segura para entornos gráficos 3D
 window.addEventListener('load', () => {
-    const game = new Game();
-    game.start();
+    // Esperamos dinámicamente en bucle hasta que Three.js se cargue por completo desde el CDN
+    const comprobarLibrerias = setInterval(() => {
+        if (typeof THREE !== 'undefined') {
+            clearInterval(comprobarLibrerias); // Frenamos la espera
+            try {
+                console.log("¡Three.js detectado con éxito! Arrancando motor gráfico...");
+                const game = new Game();
+                game.start();
+            } catch (error) {
+                console.error("Error al inicializar los componentes del juego 3D:", error);
+            }
+        } else {
+            console.warn("Esperando a que el servidor CDN responda con los paquetes de Three.js...");
+        }
+    }, 100);
 });
