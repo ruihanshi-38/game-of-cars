@@ -19,28 +19,30 @@ class Game {
         this.input = new InputHandler();
         
         this.totalLaps = 5; 
-        // Cambiado "WALL" por "IMMUNE"
         this.availableSkills = ["BOOST", "SWAP", "FREEZE", "IMMUNE"];
 
         this.ignoreMetaWallTemporarily = false;
 
-        // --- TRAZADO AUTÉNTICO FÓRMULA 1 (Escala ampliada tipo Monza/Spa) ---
+        // Listas de peligros en el mapa
+        this.traps = [];
+        this.walls = [];
+
+        // --- TRAZADO FÓRMULA 1 (Monza/Spa ampliado) ---
         this.trackPoints = [
-            new THREE.Vector3(0, 0, 120),       // Línea de Meta / Gran Recta Principal
-            new THREE.Vector3(120, 0, 120),     // Fin de recta / Primera curva rápida
-            new THREE.Vector3(180, 0, 60),      // Curvón amplio a la derecha
-            new THREE.Vector3(140, 0, -20),     // Chicane técnica - Entrada izquierda
-            new THREE.Vector3(160, 0, -50),     // Chicane técnica - Salida derecha
-            new THREE.Vector3(80, 0, -120),     // Recta trasera de alta velocidad
-            new THREE.Vector3(-40, 0, -140),    // Horquilla de frenada fuerte (Hairpin)
-            new THREE.Vector3(-120, 0, -60),    // Curva media sinuosa
-            new THREE.Vector3(-160, 0, 20),     // Sección rápida tipo "S" de Senna
-            new THREE.Vector3(-100, 0, 80),     // Curva de entrada a meta
-            new THREE.Vector3(-40, 0, 110)      // Enlace directo a la recta principal
+            new THREE.Vector3(0, 0, 120),       
+            new THREE.Vector3(120, 0, 120),     
+            new THREE.Vector3(180, 0, 60),      
+            new THREE.Vector3(140, 0, -20),     
+            new THREE.Vector3(160, 0, -50),     
+            new THREE.Vector3(80, 0, -120),     
+            new THREE.Vector3(-40, 0, -140),    
+            new THREE.Vector3(-120, 0, -60),    
+            new THREE.Vector3(-160, 0, 20),     
+            new THREE.Vector3(-100, 0, 80),     
+            new THREE.Vector3(-40, 0, 110)      
         ];
         this.trackCurve = new THREE.CatmullRomCurve3(this.trackPoints, true);
 
-        // Geometría e indicaciones de meta
         this.metaCenter = this.trackCurve.getPointAt(0); 
         const tangent = this.trackCurve.getTangentAt(0).normalize();
         this.metaAngle = Math.atan2(-tangent.z, tangent.x) + Math.PI / 2;
@@ -48,6 +50,7 @@ class Game {
         this.previousCarPositions = [{ x: 0, z: 0 }, { x: 0, z: 0 }];
 
         this.createTrack();
+        this.spawnTrackHazards(); // <-- Inyección de trampas y muros estáticos
         this.createDynamicMetaAndLights(); 
         this.initPlayers();
         this.buildCustomUI(); 
@@ -79,20 +82,65 @@ class Game {
     }
 
     createTrack() {
-        // --- CARRETERA MUCHO MÁS ANCHA ---
-        // Incrementamos el radio de la pista a 22 (antes era 10) para dar espacio a trampas
         const trackGeo = new THREE.TubeGeometry(this.trackCurve, 120, 22, 16, true);
         const trackMat = new THREE.MeshLambertMaterial({ color: 0x2c3e50 }); 
         const trackMesh = new THREE.Mesh(trackGeo, trackMat);
-        trackMesh.scale.set(1, 0.005, 1); // Más plano para simular asfalto de circuito
+        trackMesh.scale.set(1, 0.005, 1); 
         this.scene.add(trackMesh);
+    }
+
+    spawnTrackHazards() {
+        // --- CONFIGURACIÓN DE TRAMPAS DE ARENA (Ralentizan) ---
+        // Las colocamos en puntos clave del trazado (coordenadas x, z y su radio de acción)
+        const trapPositions = [
+            { x: 150, z: 20, radius: 8 },   // Mitad de la primera curva abierta
+            { x: 150, z: -35, radius: 7 },  // En plena chicane técnica
+            { x: -80, z: -110, radius: 9 }, // Entrada a la horquilla cerrada
+            { x: -140, z: 50, radius: 8 }   // Zona de las eses rápidas
+        ];
+
+        const trapGeo = new THREE.CylinderGeometry(1, 1, 0.1, 16);
+        const trapMat = new THREE.MeshLambertMaterial({ color: '#d1ccc0' }); // Color arena de escape
+
+        trapPositions.forEach(pos => {
+            const trapMesh = new THREE.Mesh(trapGeo, trapMat);
+            trapMesh.position.set(pos.x, 0.05, pos.z);
+            trapMesh.scale.set(pos.radius, 1, pos.radius); // Escalado dinámico según el radio
+            this.scene.add(trapMesh);
+            
+            this.traps.push({ x: pos.x, z: pos.z, radius: pos.radius });
+        });
+
+        // --- CONFIGURACIÓN DE MUROS DE HORMIGÓN (Bloqueos) ---
+        // Estructuras cuadradas elevadas en medio de la carretera
+        const wallPositions = [
+            { x: 60, z: 125, w: 3, l: 12 },    // Obstáculo en la gran recta principal
+            { x: 145, z: -25, w: 10, l: 3 },   // Bloqueo interior de la chicane
+            { x: -40, z: -140, w: 3, l: 14 },  // Muro divisor en el ápice de la horquilla fuerte
+            { x: -110, z: 75, w: 12, l: 3 }    // Muro a sortear antes de encarar la meta
+        ];
+
+        const wallMat = new THREE.MeshLambertMaterial({ color: '#7f8c8d' }); // Gris hormigón
+
+        wallPositions.forEach(pos => {
+            const wallGeo = new THREE.BoxGeometry(pos.w, 3, pos.l);
+            const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+            wallMesh.position.set(pos.x, 1.5, pos.z);
+            this.scene.add(wallMesh);
+
+            this.walls.push({
+                x: pos.x,
+                z: pos.z,
+                halfW: pos.w / 2,
+                halfL: pos.l / 2
+            });
+        });
     }
 
     createDynamicMetaAndLights() {
         this.metaGroupMaster = new THREE.Group();
         this.metaGroupMaster.position.copy(this.metaCenter);
 
-        // Se adapta el tamaño de la estructura de meta a la nueva anchura de pista
         const metaAncho = 44; 
         const metaLargo = 4;  
         const metaAlto = 0.05; 
@@ -164,10 +212,8 @@ class Game {
         const forwardVector = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle).normalize();
         const sideVector = new THREE.Vector3(-forwardVector.z, 0, forwardVector.x).normalize();
 
-        // Retrocedemos un poco más (10 unidades) por seguridad de escala de pista de F1
         const startLineCenter = this.metaCenter.clone().addScaledVector(forwardVector, -10);
 
-        // Separación más cómoda gracias a la pista ancha: J1 a la izquierda (-5.0) y J2 a la derecha (+5.0)
         const p1Pos = startLineCenter.clone().addScaledVector(sideVector, -5.0);
         const p2Pos = startLineCenter.clone().addScaledVector(sideVector, 5.0);
 
@@ -222,7 +268,6 @@ class Game {
             let rival = car.id === 1 ? this.cars[1] : this.cars[0];
             rival.activateFreeze();
         } else if (skill === "IMMUNE") {
-            // Activación de la nueva habilidad de Inmunidad
             car.activateImmunity();
         }
 
@@ -268,6 +313,7 @@ class Game {
 
         this.processTrackCollisions();
         this.processCarCollisions();
+        this.processHazardCollisions(); // <-- Comprobador de trampas de arena y muros
         this.processLapsAndMetaWalls(); 
         this.cameraFollow();
         this.updateUI();
@@ -282,7 +328,6 @@ class Game {
             const closestPoint = this.getClosestPoint(carPos, this.trackCurve);
             const dist = carPos.distanceTo(closestPoint);
 
-            // Ajustada la colisión de los límites del circuito a 21.5 (medio punto menos que el grosor real)
             if (dist > 21.5) {
                 car.bounce();
                 const returnDir = new THREE.Vector3().subVectors(closestPoint, carPos).normalize();
@@ -292,8 +337,52 @@ class Game {
         });
     }
 
+    processHazardCollisions() {
+        this.cars.forEach(car => {
+            // --- 1. PROCESAR TRAMPAS DE ARENA (RALENTIZACIÓN) ---
+            let inSand = false;
+            
+            // Si el coche es inmune, se salta por completo el chequeo de arena
+            if (!car.isImmune) {
+                for (let trap of this.traps) {
+                    const dx = car.x - trap.x;
+                    const dz = car.z - trap.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    if (dist < trap.radius) {
+                        inSand = true;
+                        break;
+                    }
+                }
+            }
+
+            // Aplicar castigo de velocidad en arena si corresponde
+            if (inSand) {
+                car.maxSpeed = car.baseMaxSpeed * 0.35; // Frenazo importante
+            } else if (car.maxSpeed < car.baseMaxSpeed * 1.5) { 
+                // Restaura velocidad base (siempre que no esté bajo los efectos del BOOST)
+                car.maxSpeed = car.baseMaxSpeed;
+            }
+
+            // --- 2. PROCESAR MUROS SÓLIDOS (COLISIONES AABB) ---
+            if (!car.isImmune) { // ¡Si eres inmune, atraviesas los muros limpiamente!
+                for (let wall of this.walls) {
+                    if (car.x > wall.x - wall.halfW - 1.0 && car.x < wall.x + wall.halfW + 1.0 &&
+                        car.z > wall.z - wall.halfL - 1.5 && car.z < wall.z + wall.halfL + 1.5) {
+                        
+                        car.bounce();
+                        // Expulsión simple del coche fuera del cuadro de colisión del muro
+                        const dirX = car.x > wall.x ? 1 : -1;
+                        const dirZ = car.z > wall.z ? 1 : -1;
+                        car.x += dirX * 0.5;
+                        car.z += dirZ * 0.5;
+                    }
+                }
+            }
+        });
+    }
+
     getClosestPoint(pos, curve) {
-        const points = curve.getPoints(150); // Incrementada la precisión por trazado F1 largo
+        const points = curve.getPoints(150); 
         let closest = points[0]; let minDist = pos.distanceTo(closest);
         for (let i = 1; i < points.length; i++) {
             let d = pos.distanceTo(points[i]);
@@ -306,7 +395,6 @@ class Game {
         const c1 = this.cars[0]; const c2 = this.cars[1];
         if (!c1 || !c2) return;
 
-        // Si ALGUNO de los coches tiene activada la habilidad IMMUNE, se ignoran los choques entre ellos
         if (c1.isImmune || c2.isImmune) return;
 
         const dx = c2.x - c1.x; const dz = c2.z - c1.z;
@@ -326,7 +414,6 @@ class Game {
 
         this.cars.forEach((car, index) => {
             const oldPos = this.previousCarPositions[index];
-            // Marcador intermedio de paso por vuelta ampliado a la escala del nuevo circuito
             if (car.z < -40) car.passedCheckpoint = true;
 
             const oldDist = new THREE.Vector3(oldPos.x, 0, oldPos.z).sub(this.metaCenter).dot(planeNormal);
@@ -334,7 +421,6 @@ class Game {
 
             const localPos = new THREE.Vector3(car.x, 0, car.z).sub(this.metaCenter).applyAxisAngle(new THREE.Vector3(0, 1, 0), -this.metaAngle);
 
-            // El control de paso de meta ahora cubre los 22 de ancho de la pista
             if (Math.abs(localPos.x) < 23) {
                 if (oldDist <= 0 && currentDist > 0) {
                     if (car.passedCheckpoint) {
@@ -371,7 +457,6 @@ class Game {
         const distZ = Math.abs(this.cars[0].z - this.cars[1].z);
         const maxDist = Math.max(distX, distZ);
 
-        // Subimos un poco la cámara base para que se aprecie mejor la amplitud del circuito F1
         const targetHeight = Math.max(55, 45 + (maxDist * 1.0));
 
         this.camera.position.x += (midX - this.camera.position.x) * 0.05;
