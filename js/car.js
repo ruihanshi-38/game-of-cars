@@ -28,7 +28,7 @@ class Car {
         this.skills = []; 
         this.frozenBySkill = false;
         
-        // --- NUEVA HABILIDAD: INMUNIDAD ---
+        // --- HABILIDAD: INMUNIDAD ---
         this.isImmune = false;
         this.blinkInterval = null;
 
@@ -91,6 +91,7 @@ class Car {
             if (Math.abs(this.speed) < this.friction) this.speed = 0;
         }
 
+        // Limitador dinámico de velocidad máxima
         if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
         if (this.speed < -this.maxSpeed * 0.4) this.speed = -this.maxSpeed * 0.4;
 
@@ -122,7 +123,7 @@ class Car {
     activateBoost() {
         this.maxSpeed = this.baseMaxSpeed * 2.0; 
         this.speed = this.maxSpeed;
-        this.bodyMat.color.setHex(0xf1c40f); // Dorado/Amarillo
+        this.bodyMat.color.setHex(0xf1c40f); 
 
         setTimeout(() => {
             this.maxSpeed = this.baseMaxSpeed;
@@ -131,11 +132,10 @@ class Car {
     }
 
     activateFreeze() {
-        // Si el coche es inmune, ignora por completo el ataque de congelación
         if (this.isImmune) return;
 
         this.frozenBySkill = true;
-        this.bodyMat.color.setHex(0x34e7e4); // Color hielo azulado
+        this.bodyMat.color.setHex(0x34e7e4); 
 
         setTimeout(() => {
             this.frozenBySkill = false;
@@ -146,17 +146,16 @@ class Car {
     activateImmunity() {
         this.isImmune = true;
         
-        // Efecto visual: Parpadeo brillante de inmunidad
         let visible = false;
         this.blinkInterval = setInterval(() => {
             visible = !visible;
             this.bodyMat.color.setHex(visible ? 0xffffff : this.color);
-        }, 1500);
+        }, 150); // Parpadeo rápido e intenso de poder
 
         setTimeout(() => {
             clearInterval(this.blinkInterval);
             this.isImmune = false;
-            this.bodyMat.color.setHex(this.color); // Restaurar color original
+            this.bodyMat.color.setHex(this.color); 
         }, 5000);
     }
 }
