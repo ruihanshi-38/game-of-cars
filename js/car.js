@@ -9,26 +9,22 @@ class Car {
         this.z = z;
         this.angle = 0;
         this.speed = 0;
-        this.vx = 0;
-        this.vz = 0;
 
-        // --- VELOCIDAD Y CONTROL ---
-        this.baseMaxSpeed = 0.6;    
-        this.maxSpeed = this.baseMaxSpeed;
-        this.acceleration = 0.025;
+        // --- AJUSTES DE MOVIMIENTO EN PERSPECTIVA DE PANTALLA ---
+        this.maxSpeed = 0.6;    
+        this.baseMaxSpeed = this.maxSpeed;
+        this.acceleration = 0.04;
         this.friction = 0.02;
-        this.brakingForce = 0.10;
-        this.driftFactor = 0.75;   
-        this.steerSpeed = 0.038;   
+        this.turnSpeed = 0.15; // Velocidad de rotación fluida hacia el objetivo
 
         this.currentLap = 1;
         this.passedCheckpoint = false;
         
-        // Sistema de habilidades limitadas
+        // Habilidades
         this.skills = []; 
         this.frozenBySkill = false;
         
-        // --- HABILIDAD: INMUNIDAD ---
+        // Habilidad: Inmunidad
         this.isImmune = false;
         this.blinkInterval = null;
 
@@ -75,49 +71,61 @@ class Car {
     update(input) {
         if (this.frozenBySkill) {
             this.speed = 0;
-            this.vx = 0;
-            this.vz = 0;
             this.mesh.position.set(this.x, 0, this.z);
             return;
         }
 
-        if (input && input.forward) {
+        // Determinar vectores de dirección basados estrictamente en la pantalla (X y Z globales)
+        let moveX = 0;
+        let moveZ = 0;
+
+        if (input) {
+            if (input.forward)  moveZ -= 1; // Hacia arriba en la pantalla (-Z)
+            if (input.backward) moveZ += 1; // Hacia abajo en la pantalla (+Z)
+            if (input.left)     moveX -= 1; // Hacia la izquierda (-X)
+            if (input.right)    moveX += 1; // Hacia la derecha (+X)
+        }
+
+        // Si hay alguna tecla pulsada
+        if (moveX !== 0 || moveZ !== 0) {
+            // Calcular el ángulo objetivo al que debe mirar el coche
+            const targetAngle = Math.atan2(moveX, moveZ) + Math.PI;
+
+            // Suavizar la rotación del coche hacia esa dirección
+            let diff = targetAngle - this.angle;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            this.angle += diff * this.turnSpeed;
+
+            // Incrementar velocidad de traslación
             this.speed += this.acceleration;
-        } else if (input && input.backward) {
-            this.speed -= this.brakingForce;
+            if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
+
+            // Mover el coche directamente en la dirección del joystick/teclas (normalizado)
+            const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
+            this.x += (moveX / length) * this.speed;
+            this.z += (moveZ / length) * this.speed;
         } else {
-            if (this.speed > 0) this.speed -= this.friction;
-            if (this.speed < 0) this.speed += this.friction;
-            if (Math.abs(this.speed) < this.friction) this.speed = 0;
+            // Aplicar fricción si no se pulsa nada
+            this.speed -= this.friction;
+            if (this.speed < 0) this.speed = 0;
+
+            // Avanzar inercialmente en la última dirección del ángulo actual
+            if (this.speed > 0) {
+                this.x -= Math.sin(this.angle) * this.speed;
+                this.z -= Math.cos(this.angle) * this.speed;
+            }
         }
-
-        // Limitador dinámico de velocidad máxima
-        if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
-        if (this.speed < -this.maxSpeed * 0.4) this.speed = -this.maxSpeed * 0.4;
-
-        if (this.speed !== 0) {
-            const dir = this.speed > 0 ? 1 : -1;
-            if (input && input.left) this.angle += this.steerSpeed * dir;
-            if (input && input.right) this.angle -= this.steerSpeed * dir;
-        }
-
-        const forwardX = -Math.sin(this.angle) * this.speed;
-        const forwardZ = -Math.cos(this.angle) * this.speed;
-
-        this.vx = this.vx * this.driftFactor + forwardX * (1 - this.driftFactor);
-        this.vz = this.vz * this.driftFactor + forwardZ * (1 - this.driftFactor);
-
-        this.x += this.vx;
-        this.z += this.vz;
 
         this.mesh.position.set(this.x, 0, this.z);
         this.mesh.rotation.y = this.angle;
     }
 
     bounce() {
-        this.speed = -this.speed * 0.3;
-        this.vx = -this.vx * 0.3;
-        this.vz = -this.vz * 0.3;
+        // Rebotar invirtiendo la inercia instantánea
+        this.speed = -this.speed * 0.4;
+        this.x += Math.sin(this.angle) * this.speed * 2;
+        this.z += Math.cos(this.angle) * this.speed * 2;
     }
 
     activateBoost() {
@@ -150,7 +158,7 @@ class Car {
         this.blinkInterval = setInterval(() => {
             visible = !visible;
             this.bodyMat.color.setHex(visible ? 0xffffff : this.color);
-        }, 150); // Parpadeo rápido e intenso de poder
+        }, 150); 
 
         setTimeout(() => {
             clearInterval(this.blinkInterval);
