@@ -30,7 +30,13 @@
             font-size: 14px;
         }
         .ui-box span { color: #575fcf; }
-        canvas { display: block; }
+        canvas { 
+            display: block; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
@@ -42,7 +48,6 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
     <script src="js/input.js"></script>
     <script src="js/car.js"></script>
     <script src="js/game.js"></script>
