@@ -12,30 +12,32 @@ class Car {
         this.vx = 0;
         this.vz = 0;
 
-        // --- VELOCIDAD EXTREMADAMENTE LENTA PARA MÁXIMO CONTROL ---
-        this.baseMaxSpeed = 0.5;    
+        // --- VELOCIDAD Y CONTROL ---
+        this.baseMaxSpeed = 0.6;    
         this.maxSpeed = this.baseMaxSpeed;
-        this.acceleration = 0.02;
+        this.acceleration = 0.025;
         this.friction = 0.02;
         this.brakingForce = 0.10;
         this.driftFactor = 0.75;   
-        this.steerSpeed = 0.035;   
+        this.steerSpeed = 0.038;   
 
         this.currentLap = 1;
         this.passedCheckpoint = false;
         
-        // Sistema de habilidades limitadas aleatorias
+        // Sistema de habilidades limitadas
         this.skills = []; 
         this.frozenBySkill = false;
-        this.hasPassableWallActive = false;
-        this.myWallMesh = null;
+        
+        // --- NUEVA HABILIDAD: INMUNIDAD ---
+        this.isImmune = false;
+        this.blinkInterval = null;
 
         // --- MODELADO DEL COCHE EN 3D ---
         this.mesh = new THREE.Group();
 
         const bodyGeo = new THREE.BoxGeometry(1.6, 0.6, 3.2);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: color });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        this.bodyMat = new THREE.MeshLambertMaterial({ color: color });
+        const body = new THREE.Mesh(bodyGeo, this.bodyMat);
         body.position.y = 0.4;
         this.mesh.add(body);
 
@@ -118,44 +120,43 @@ class Car {
     }
 
     activateBoost() {
-        this.maxSpeed = this.baseMaxSpeed * 2.2; 
+        this.maxSpeed = this.baseMaxSpeed * 2.0; 
         this.speed = this.maxSpeed;
-        this.mesh.children[0].material.color.setHex(0xf1c40f); 
+        this.bodyMat.color.setHex(0xf1c40f); // Dorado/Amarillo
 
         setTimeout(() => {
             this.maxSpeed = this.baseMaxSpeed;
-            this.mesh.children[0].material.color.setHex(this.color); 
+            if (!this.isImmune) this.bodyMat.color.setHex(this.color); 
         }, 5000);
     }
 
     activateFreeze() {
+        // Si el coche es inmune, ignora por completo el ataque de congelación
+        if (this.isImmune) return;
+
         this.frozenBySkill = true;
-        this.mesh.children[0].material.color.setHex(0x34e7e4); 
+        this.bodyMat.color.setHex(0x34e7e4); // Color hielo azulado
 
         setTimeout(() => {
             this.frozenBySkill = false;
-            this.mesh.children[0].material.color.setHex(this.color);
+            if (!this.isImmune) this.bodyMat.color.setHex(this.color);
         }, 3000);
     }
 
-    spawnSpecialWall() {
-        const wallGeo = new THREE.BoxGeometry(20, 3, 0.6); 
-        const wallMat = new THREE.MeshLambertMaterial({ 
-            color: this.color, 
-            transparent: true, 
-            opacity: 0.6 
-        });
+    activateImmunity() {
+        this.isImmune = true;
         
-        this.myWallMesh = new THREE.Mesh(wallGeo, wallMat);
-        this.myWallMesh.position.set(this.x, 1.5, this.z);
-        this.myWallMesh.rotation.y = this.angle; 
-        this.scene.add(this.myWallMesh);
-        this.hasPassableWallActive = true;
+        // Efecto visual: Parpadeo brillante de inmunidad
+        let visible = false;
+        this.blinkInterval = setInterval(() => {
+            visible = !visible;
+            this.bodyMat.color.setHex(visible ? 0xffffff : this.color);
+        }, 1500);
 
         setTimeout(() => {
-            this.scene.remove(this.myWallMesh);
-            this.myWallMesh = null;
-            this.hasPassableWallActive = false;
-        }, 15000);
+            clearInterval(this.blinkInterval);
+            this.isImmune = false;
+            this.bodyMat.color.setHex(this.color); // Restaurar color original
+        }, 5000);
     }
 }
