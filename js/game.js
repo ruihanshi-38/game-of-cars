@@ -2,22 +2,22 @@ class Game {
     constructor() {
         // 1. Crear la escena
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x27ae60); // Fondo verde pista
+        this.scene.background = new THREE.Color(0x27ae60); 
 
-        // 2. Configurar el renderizador (Solución de pantalla negra)
+        // 2. Configurar el renderizador
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.domElement.style.position = 'absolute';
         this.renderer.domElement.style.top = '0';
         this.renderer.domElement.style.left = '0';
-        this.renderer.domElement.style.zIndex = '1'; // Fuerza al canvas a ir al frente sobre el fondo
+        this.renderer.domElement.style.zIndex = '1'; 
         document.body.appendChild(this.renderer.domElement);
 
         // 3. Posicionar la cámara
         this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
         this.camera.position.set(0, 80, 80);
 
-        // 4. Iluminación total (Vital para que los objetos no se vean negros)
+        // 4. Iluminación total
         const ambient = new THREE.AmbientLight(0xffffff, 0.85);
         this.scene.add(ambient);
         const sun = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -42,9 +42,6 @@ class Game {
         this.explosiveMines = [];
         this.activeMissiles = []; 
 
-        this.p1Alert = "";
-        this.p2Alert = "";
-
         // Trazado del circuito original
         this.trackPoints = [
             new THREE.Vector3(0, 0, 120),       
@@ -65,7 +62,8 @@ class Game {
         const tangent = this.trackCurve.getTangentAt(0).normalize();
         this.metaAngle = Math.atan2(-tangent.z, tangent.x) + Math.PI / 2;
 
-        this.previousCarPositions = [{ x: 0, z: 0 }, { x: 0, z: 0 }];
+        // SOLUCIÓN AL ERROR: Inicializar posiciones previas para que no de 'undefined'
+        this.previousCarPositions = [{ x: this.metaCenter.x, z: this.metaCenter.z }, { x: this.metaCenter.x, z: this.metaCenter.z }];
 
         // Construcción del mapa
         this.createTrack();
@@ -81,26 +79,9 @@ class Game {
     }
 
     buildCleanUI() {
-        let existiendo = document.getElementById('hud-racing');
-        if (existiendo) existiendo.remove();
-
-        this.uiContainer = document.createElement('div');
-        this.uiContainer.id = 'hud-racing';
-        this.uiContainer.style.position = 'absolute';
-        this.uiContainer.style.top = '20px'; 
-        this.uiContainer.style.left = '50%';
-        this.uiContainer.style.transform = 'translateX(-50%)';
-        this.uiContainer.style.fontFamily = 'monospace, sans-serif';
-        this.uiContainer.style.backgroundColor = 'rgba(10, 25, 15, 0.85)';
-        this.uiContainer.style.color = '#fff';
-        this.uiContainer.style.padding = '15px 30px';
-        this.uiContainer.style.borderRadius = '10px';
-        this.uiContainer.style.border = '2px solid #2ecc71';
-        this.uiContainer.style.textAlign = 'center';
-        this.uiContainer.style.zIndex = '99999'; // Forzar UI por encima del canvas
-        this.uiContainer.style.fontSize = '15px';
-        this.uiContainer.style.minWidth = '550px';
-        document.body.appendChild(this.uiContainer);
+        // Enlazamos directamente con tu #ui-panel del HTML
+        this.speedValEl = document.getElementById('speed-val');
+        this.lapValEl = document.getElementById('lap-val');
     }
 
     createTrack() {
@@ -123,13 +104,13 @@ class Game {
             this.traps.push({ x: pos.x, z: pos.z, radius: pos.radius });
         });
 
-        // Trampas Invisibles (Aceite / Charcos fijos)
+        // Trampas Invisibles
         this.invisibleTraps = [
             { x: 40, z: 120, radius: 6, name: "Charco Fantasma" },
             { x: 100, z: -100, radius: 6, name: "Aceite Derramado" }
         ];
 
-        // Muros estáticos en medio del circuito
+        // Muros estáticos
         const wallPositions = [{ x: 145, z: -25, w: 9, l: 3 }, { x: -40, z: -140, w: 3, l: 15 }];
         const wallMat = new THREE.MeshLambertMaterial({ color: '#7f8c8d' }); 
         wallPositions.forEach(pos => {
@@ -139,7 +120,7 @@ class Game {
             this.walls.push({ x: pos.x, z: pos.z, halfW: pos.w / 2, halfL: pos.l / 2, active: true });
         });
 
-        // Cajas Sorpresa Críticas
+        // Cajas Sorpresa
         const boxPositions = [{ x: 110, z: 120 }, { x: -150, z: 20 }];
         const boxGeo = new THREE.BoxGeometry(2, 2, 2);
         const boxMat = new THREE.MeshLambertMaterial({ color: 0xff3333 }); 
@@ -149,7 +130,7 @@ class Game {
             this.surpriseBoxes.push({ mesh: bMesh, x: pos.x, z: pos.z, triggered: false });
         });
 
-        // Turbo Mats (Placas Cian de aceleración)
+        // Turbo Mats
         const turboPositions = [{ x: 25, z: 120 }, { x: 170, z: 25 }, { x: -30, z: -140 }];
         const turboGeo = new THREE.BoxGeometry(4, 0.08, 4);
         const turboMat = new THREE.MeshBasicMaterial({ color: 0x00ffff }); 
@@ -159,7 +140,7 @@ class Game {
             this.turboMats.push({ x: pos.x, z: pos.z });
         });
 
-        // Rampas de Salto (Estructuras Naranjas con físicas)
+        // Rampas de Salto
         const rampPositions = [{ x: 60, z: 120, w: 6, h: 2, l: 8, rotY: Math.PI / 2 }, { x: -90, z: 80, w: 6, h: 2, l: 8, rotY: 0 }];
         rampPositions.forEach(pos => {
             const rampGroup = new THREE.Group();
@@ -178,7 +159,7 @@ class Game {
             this.ramps.push({ x: pos.x, z: pos.z, radius: 4.5 });
         });
 
-        // Minas Explosivas Rojas
+        // Minas Explosivas
         const minePositions = [{ x: 160, z: 55 }, { x: -70, z: -120 }];
         const mineGeo = new THREE.SphereGeometry(0.7, 12, 12);
         const mineMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
@@ -227,11 +208,9 @@ class Game {
             if (this.globalMatchFrozen || !this.cars || !this.cars[0]) return;
             const k = e.key.toLowerCase();
             
-            // J1: K y L
             if (k === 'k') this.triggerSkill(this.cars[0], 0);
             if (k === 'l') this.triggerSkill(this.cars[0], 1);
 
-            // J2: V y B (Sincronizado exactamente con tu HUD de pantalla)
             if (k === 'v') this.triggerSkill(this.cars[1], 0);
             if (k === 'b') this.triggerSkill(this.cars[1], 1);
         });
@@ -287,18 +266,19 @@ class Game {
         if (this.cars && this.cars[0] && this.cars[1]) {
             this.cars[0].update(this.input.getPlayer1Input());
             this.cars[1].update(this.input.getPlayer2Input());
+            
+            this.updateHomingMissiles(); 
+            this.processTrackCollisions();
+            this.processCarCollisions();
+            this.processHazardCollisions(); 
+            this.processLapsAndMeta(); 
+            this.cameraFollow();
+            this.updateUI();
+
+            // Guardar el rastro de posiciones de forma segura
+            this.previousCarPositions[0] = { x: this.cars[0].x, z: this.cars[0].z };
+            this.previousCarPositions[1] = { x: this.cars[1].x, z: this.cars[1].z };
         }
-
-        this.updateHomingMissiles(); 
-        this.processTrackCollisions();
-        this.processCarCollisions();
-        this.processHazardCollisions(); 
-        this.processLapsAndMeta(); 
-        this.cameraFollow();
-        this.updateUI();
-
-        if (this.cars[0]) this.previousCarPositions[0] = { x: this.cars[0].x, z: this.cars[0].z };
-        if (this.cars[1]) this.previousCarPositions[1] = { x: this.cars[1].x, z: this.cars[1].z };
     }
 
     updateHomingMissiles() {
@@ -343,22 +323,15 @@ class Game {
         this.cars.forEach(car => {
             const isFlying = car.y > 0.8;
 
-            // Rampas
             if (!isFlying) {
                 this.ramps.forEach(ramp => {
                     if (Math.sqrt((car.x - ramp.x)**2 + (car.z - ramp.z)**2) < ramp.radius) { car.launchIntoAir(0.75); }
                 });
-            }
 
-            // Turbo Mats
-            if (!isFlying) {
                 this.turboMats.forEach(mat => {
                     if (Math.sqrt((car.x - mat.x)**2 + (car.z - mat.z)**2) < 3.0) { car.turboTimer = Math.max(car.turboTimer, 60); }
                 });
-            }
 
-            // Minas Rojas
-            if (!isFlying) {
                 this.explosiveMines.forEach(mine => {
                     if (!mine.triggered && Math.sqrt((car.x - mine.x)**2 + (car.z - mine.z)**2) < 2.5) {
                         mine.triggered = true; this.scene.remove(mine.mesh); car.launchIntoAir(1.3);
@@ -366,7 +339,6 @@ class Game {
                 });
             }
 
-            // Ralentización por arena / trampas invisibles
             let inSlowZone = false;
             if (!isFlying) {
                 this.traps.forEach(t => { if (Math.sqrt((car.x - t.x)**2 + (car.z - t.z)**2) < t.radius) inSlowZone = true; });
@@ -374,7 +346,6 @@ class Game {
             }
             car.maxSpeed = inSlowZone ? car.baseMaxSpeed * 0.35 : car.baseMaxSpeed;
 
-            // Muros dinámicos y fijos
             for (let wall of this.walls) {
                 if (car.x > wall.x - wall.halfW - 1.0 && car.x < wall.x + wall.halfW + 1.0 &&
                     car.z > wall.z - wall.halfL - 1.5 && car.z < wall.z + wall.halfL + 1.5) {
@@ -395,7 +366,10 @@ class Game {
     processLapsAndMeta() {
         const planeNormal = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle);
         this.cars.forEach((car, index) => {
-            const oldPos = this.previousCarPositions[index]; if (car.z < -20) car.passedCheckpoint = true;
+            if (car.z < -20) car.passedCheckpoint = true;
+            
+            // Verificación segura de que las posiciones previas existan
+            const oldPos = this.previousCarPositions[index] || { x: car.x, z: car.z };
             const oldDist = new THREE.Vector3(oldPos.x, 0, oldPos.z).sub(this.metaCenter).dot(planeNormal);
             const currentDist = new THREE.Vector3(car.x, 0, car.z).sub(this.metaCenter).dot(planeNormal);
 
@@ -414,16 +388,13 @@ class Game {
     }
 
     updateUI() {
-        if (!this.uiContainer) return;
-        this.uiContainer.innerHTML = `
-            <div style="font-weight: bold; color: #2ecc71; margin-bottom: 8px; letter-spacing: 1px;">MODO EXTREMO - COMBATE TOTAL</div>
-            <div style="margin-bottom: 5px;">
-                <span style="color:#e74c3c; font-weight:bold;">J1 (Rojo)</span> | Vuelta: ${this.cars[0].currentLap}/${this.totalLaps} | Poderes [K, L]: <span style="color:#f1c40f;">${this.cars[0].skills[0]}</span>, <span style="color:#f1c40f;">${this.cars[0].skills[1]}</span>
-            </div>
-            <div>
-                <span style="color:#3498db; font-weight:bold;">J2 (Azul)</span> | Vuelta: ${this.cars[1].currentLap}/${this.totalLaps} | Poderes [V, B]: <span style="color:#f1c40f;">${this.cars[1].skills[0]}</span>, <span style="color:#f1c40f;">${this.cars[1].skills[1]}</span>
-            </div>
-        `;
+        if (!this.speedValEl || !this.lapValEl) return;
+        
+        let v1 = Math.round(this.cars[0].speed * 300);
+        let v2 = Math.round(this.cars[1].speed * 300);
+        
+        this.speedValEl.innerHTML = `J1: ${v1} | J2: ${v2}`;
+        this.lapValEl.innerHTML = `J1: ${this.cars[0].currentLap}/${this.totalLaps} [${this.cars[0].skills[0]}, ${this.cars[0].skills[1]}] | J2: ${this.cars[1].currentLap}/${this.totalLaps} [${this.cars[1].skills[0]}, ${this.cars[1].skills[1]}]`;
     }
 
     onWindowResize() {
@@ -432,9 +403,8 @@ class Game {
     }
 }
 
-// Inicialización controlada
 window.addEventListener('load', () => {
     setTimeout(() => {
         const game = new Game(); game.start();
-    }, 200);
+    }, 100);
 });
