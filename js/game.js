@@ -19,22 +19,25 @@ class Game {
         this.input = new InputHandler();
         
         this.totalLaps = 5; 
-        this.availableSkills = ["BOOST", "SWAP", "FREEZE", "IMMUNE"];
+        this.availableSkills = ["BOOST", "SWAP", "FREEZE", "IMMUNE", "HOMING_MISSILE"];
 
         this.ignoreMetaWallTemporarily = false;
         this.globalMatchFrozen = true; 
 
-        // Repositorio de peligros
+        // Repositorios de elementos del mapa
         this.traps = [];
-        this.invisibleTraps = []; // <-- NUEVO: Trampas fantasma que no se renderizan
+        this.invisibleTraps = []; 
         this.walls = [];
         this.surpriseBoxes = [];
+        this.turboMats = [];
+        this.ramps = [];
+        this.explosiveMines = [];
+        this.activeMissiles = []; // Control de proyectiles teledirigidos en vuelo
 
-        // Mensajes de alerta temporales de trampas pisadas
         this.p1Alert = "";
         this.p2Alert = "";
 
-        // --- TRAZADO FÓRMULA 1 (Monza/Spa) ---
+        // --- TRAZADO FÓRMULA 1 (Monza/Spa ampliado) ---
         this.trackPoints = [
             new THREE.Vector3(0, 0, 120),       
             new THREE.Vector3(120, 0, 120),     
@@ -73,45 +76,52 @@ class Game {
         overlay.style.position = 'absolute';
         overlay.style.top = '0'; overlay.style.left = '0';
         overlay.style.width = '100%'; overlay.style.height = '100%';
-        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.95)';
         overlay.style.display = 'flex'; overlay.style.flexDirection = 'column';
         overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
         overlay.style.zIndex = '100000'; overlay.style.fontFamily = 'monospace, sans-serif';
         overlay.style.color = '#fff';
 
         overlay.innerHTML = `
-            <h1 style="color: #f1c40f; margin-bottom: 30px; font-size: 32px; text-shadow: 0 0 10px rgba(241,196,15,0.5);">PREPARADOS PARA LA CARRERA</h1>
-            <h3 style="color: #e67e22; margin-bottom: 20px;">CONTROLES MODO PANTALLA (Dirección absoluta del jugador)</h3>
+            <h1 style="color: #f1c40f; margin-bottom: 20px; font-size: 34px; text-shadow: 0 0 10px rgba(241,196,15,0.6);">MANUAL DE COMBATE Y CONTROLES</h1>
+            <h4 style="color: #3498db; margin-bottom: 25px;">MODO PANTALLA ARCADE (Los coches giran hacia donde pulsas en la pantalla)</h4>
             
-            <div style="display: flex; gap: 60px; background: rgba(255,255,255,0.05); padding: 30px; border-radius: 12px; border: 1px solid #444;">
-                <div style="text-align: center; min-width: 230px;">
-                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 5px;">JUGADOR 1 (Rojo)</h2>
-                    <p style="margin: 15px 0;"><b>Moverse:</b> Flechas del Teclado<br><small>(Hacia donde apunte la flecha irá el coche)</small></p>
-                    <p style="margin: 5px 0;"><b>Poder Slot 1:</b> Tecla K</p>
-                    <p style="margin: 5px 0;"><b>Poder Slot 2:</b> Tecla L</p>
+            <div style="display: flex; gap: 40px; background: rgba(255,255,255,0.04); padding: 25px; border-radius: 12px; border: 1px solid #444; max-width: 850px;">
+                <div style="text-align: center; flex: 1;">
+                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 5px; margin-top:0;">JUGADOR 1 (Rojo)</h2>
+                    <p style="margin: 12px 0; font-size:15px;"><b>Dirección:</b> Flechas del Teclado</p>
+                    <p style="margin: 5px 0;"><b>Habilidad 1:</b> Tecla K</p>
+                    <p style="margin: 5px 0;"><b>Habilidad 2:</b> Tecla L</p>
                 </div>
                 
                 <div style="border-left: 1px solid #555;"></div>
 
-                <div style="text-align: center; min-width: 230px;">
-                    <h2 style="color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 5px;">JUGADOR 2 (Azul)</h2>
-                    <p style="margin: 15px 0;"><b>Moverse:</b> Teclas W, A, S, D<br><small>(W=Arriba, S=Abajo, A=Izquierda, D=Derecha)</small></p>
-                    <p style="margin: 5px 0;"><b>Poder Slot 1:</b> Tecla 1</p>
-                    <p style="margin: 5px 0;"><b>Poder Slot 2:</b> Tecla 2</p>
+                <div style="text-align: center; flex: 1;">
+                    <h2 style="color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-top:0;">JUGADOR 2 (Azul)</h2>
+                    <p style="margin: 12px 0; font-size:15px;"><b>Dirección:</b> Teclas W, A, S, D</p>
+                    <p style="margin: 5px 0;"><b>Habilidad 1:</b> Tecla 1</p>
+                    <p style="margin: 5px 0;"><b>Habilidad 2:</b> Tecla 2</p>
                 </div>
             </div>
 
-            <p style="color: #e74c3c; margin-top: 30px; font-size: 15px;"><b>¡ALERTA! El circuito esconde trampas 100% invisibles en el asfalto.</b></p>
-            <h2 id="countdown-text" style="color: #2ecc71; margin-top: 20px;">Iniciando en 5...</h2>
+            <div style="margin-top: 25px; text-align: center; background: rgba(241,196,15,0.1); padding: 15px; border-radius: 8px; border: 1px dashed #f1c40f; max-width:600px;">
+                <b style="color: #f1c40f;">ELEMENTOS AGREGADOS DE ALTA INTENSIDAD:</b><br>
+                <span style="color:#00ffff;">⚡ Turbo Mats (Cian):</span> Modificadores de hipervelocidad instantánea.<br>
+                <span style="color:#e67e22;">📐 Rampas Metálicas:</span> ¡Sal por los aires para saltar por encima de muros!<br>
+                <span style="color:#e74c3c;">💥 Minas Rojas:</span> Detonan provocando un descontrol aéreo total.<br>
+                <span style="color:#9b59b6;">🚀 Misil Teledirigido:</span> Persigue automáticamente al rival hasta impactar.
+            </div>
+
+            <h2 id="countdown-text" style="color: #2ecc71; margin-top: 30px; font-size: 26px;">Cargando simulador... 7s</h2>
         `;
 
         document.body.appendChild(overlay);
 
-        let timeLeft = 5;
+        let timeLeft = 7; // Duración exacta de la interfaz a petición
         const interval = setInterval(() => {
             timeLeft--;
             const countText = document.getElementById('countdown-text');
-            if (countText) countText.innerText = `Iniciando en ${timeLeft}...`;
+            if (countText) countText.innerText = `Preparando motores en ${timeLeft}...`;
             
             if (timeLeft <= 0) {
                 clearInterval(interval);
@@ -136,7 +146,7 @@ class Game {
         this.uiContainer.style.border = '1px solid #555';
         this.uiContainer.style.textAlign = 'center';
         this.uiContainer.style.zIndex = '9999';
-        this.uiContainer.style.minWidth = '550px';
+        this.uiContainer.style.minWidth = '580px';
         document.body.appendChild(this.uiContainer);
     }
 
@@ -149,10 +159,9 @@ class Game {
     }
 
     spawnTrackHazards() {
-        // 1. Trampas de arena visibles
+        // 1. Trampas de arena estándar
         const trapPositions = [
             { x: 150, z: 20, radius: 9 },   
-            { x: 150, z: -35, radius: 7 },  
             { x: -80, z: -110, radius: 10 }, 
             { x: -140, z: 50, radius: 9 }   
         ];
@@ -166,20 +175,16 @@ class Game {
             this.traps.push({ x: pos.x, z: pos.z, radius: pos.radius });
         });
 
-        // --- NUEVO: TRAMPAS 100% INVISIBLES (No se añade malla a la scene) ---
+        // Trampas 100% invisibles en tramos limpios
         this.invisibleTraps = [
-            { x: 40, z: 120, radius: 6, name: "Charco Invisible" },   // Recta principal limpia
-            { x: 170, z: 50, radius: 7, name: "Pinchos Ocultos" },    // Curva 1
-            { x: 100, z: -100, radius: 6, name: "Mancha de Aceite Oculta" }, // Recta trasera
-            { x: -140, z: -20, radius: 8, name: "Trampa de Clavos" }  // Zona de eses
+            { x: 40, z: 120, radius: 6, name: "Charco Fantasma" },
+            { x: 100, z: -100, radius: 6, name: "Mancha de Aceite Cruda" }
         ];
 
-        // 2. Muros fijos
+        // 2. Muros estructurales fijos
         const wallPositions = [
-            { x: 70, z: 123, w: 3, l: 12 },   
             { x: 145, z: -25, w: 9, l: 3 },   
-            { x: -40, z: -140, w: 3, l: 15 },  
-            { x: -110, z: 75, w: 10, l: 3 }    
+            { x: -40, z: -140, w: 3, l: 15 }
         ];
         const wallMat = new THREE.MeshLambertMaterial({ color: '#7f8c8d' }); 
         wallPositions.forEach(pos => {
@@ -190,10 +195,8 @@ class Game {
             this.walls.push({ mesh: wallMesh, x: pos.x, z: pos.z, halfW: pos.w / 2, halfL: pos.l / 2, active: true });
         });
 
-        // 3. Cajas Sorpresa sorpresa
-        const boxPositions = [
-            { x: 110, z: 120 }, { x: 150, z: -50 }, { x: -150, z: 20 }
-        ];
+        // 3. Cajas Sorpresa sorpresa clásicas
+        const boxPositions = [{ x: 110, z: 120 }, { x: -150, z: 20 }];
         const boxGeo = new THREE.BoxGeometry(2, 2, 2);
         const boxMat = new THREE.MeshLambertMaterial({ color: 0xff3333 }); 
         boxPositions.forEach(pos => {
@@ -201,40 +204,81 @@ class Game {
             this.scene.add(bMesh);
             this.surpriseBoxes.push({ mesh: bMesh, x: pos.x, z: pos.z, triggered: false });
         });
+
+        // --- NUEVO: TURBO MATS (Cian brillante) ---
+        const turboPositions = [{ x: 25, z: 120 }, { x: 170, z: 25 }, { x: -30, z: -140 }, { x: -120, z: 60 }];
+        const turboGeo = new THREE.BoxGeometry(4, 0.08, 4);
+        const turboMat = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Color de energía cian
+        turboPositions.forEach(pos => {
+            const tMesh = new THREE.Mesh(turboGeo, turboMat);
+            tMesh.position.set(pos.x, 0.06, pos.z);
+            this.scene.add(tMesh);
+            this.turboMats.push({ x: pos.x, z: pos.z });
+        });
+
+        // --- NUEVO: RAMPAS DE SALTO TRIDIMENSIONALES ---
+        const rampPositions = [
+            { x: 60, z: 120, w: 6, h: 2, l: 8, rotY: Math.PI / 2 }, 
+            { x: -90, z: 80, w: 6, h: 2, l: 8, rotY: 0 }
+        ];
+        rampPositions.forEach(pos => {
+            const rampGroup = new THREE.Group();
+            const rampGeo = new THREE.BoxGeometry(pos.w, pos.h, pos.l);
+            // Deformar cubo para hacerlo una cuña inclinada
+            const posAttr = rampGeo.attributes.position;
+            for(let i=0; i<posAttr.count; i++) {
+                if(posAttr.getZ(i) < 0) { // Parte delantera de la cuña al nivel del suelo
+                    posAttr.setY(i, -pos.h/2);
+                }
+            }
+            rampGeo.computeVertexNormals();
+
+            const rMesh = new THREE.Mesh(rampGeo, new THREE.MeshLambertMaterial({ color: '#e67e22' }));
+            rampGroup.add(rMesh);
+            rampGroup.position.set(pos.x, pos.h / 2, pos.z);
+            rampGroup.rotation.y = pos.rotY;
+            this.scene.add(rampGroup);
+
+            this.ramps.push({ x: pos.x, z: pos.z, radius: 4.5 });
+        });
+
+        // --- NUEVO: MINAS EXPLOSIVAS ACTIVAS (Esferas parpadeantes) ---
+        const minePositions = [{ x: 160, z: 55 }, { x: 130, z: -35 }, { x: -70, z: -120 }, { x: -140, z: 10 }];
+        const mineGeo = new THREE.SphereGeometry(0.7, 12, 12);
+        const mineMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        minePositions.forEach(pos => {
+            const mMesh = new THREE.Mesh(mineGeo, mineMat);
+            mMesh.position.set(pos.x, 0.3, pos.z);
+            this.scene.add(mMesh);
+            this.explosiveMines.push({ mesh: mMesh, x: pos.x, z: pos.z, triggered: false });
+        });
     }
 
     createDynamicMetaAndLights() {
         this.metaGroupMaster = new THREE.Group();
         this.metaGroupMaster.position.copy(this.metaCenter);
-
         const metaAncho = 44; const metaLargo = 4; const metaAlto = 0.05; 
-        const rows = 24; const cols = 2; 
-        const squareWidth = metaAncho / rows; const squareLength = metaLargo / cols; 
+        const rows = 24; const cols = 2; const squareWidth = metaAncho / rows; const squareLength = metaLargo / cols; 
 
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
                 const color = (r + c) % 2 === 0 ? 0xffffff : 0x1e272e;
-                const mat = new THREE.MeshLambertMaterial({ color: color });
-                const geo = new THREE.BoxGeometry(squareWidth, metaAlto, squareLength);
-                const mesh = new THREE.Mesh(geo, mat);
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(squareWidth, metaAlto, squareLength), new THREE.MeshLambertMaterial({ color: color }));
                 mesh.position.set(- (metaAncho / 2) + (r * squareWidth) + (squareWidth / 2), metaAlto / 2, - (metaLargo / 2) + (c * squareLength) + (squareLength / 2));
                 this.metaGroupMaster.add(mesh);
             }
         }
-
         const structureMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
         const postGeo = new THREE.CylinderGeometry(0.25, 0.25, 16);
         const postL = new THREE.Mesh(postGeo, structureMat); postL.position.set(-22, 8, 0);
         const postR = new THREE.Mesh(postGeo, structureMat); postR.position.set(22, 8, 0);
-        const barGeo = new THREE.CylinderGeometry(0.15, 0.15, metaAncho);
-        const bar = new THREE.Mesh(barGeo, structureMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, 16, 0);
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, metaAncho), structureMat); bar.rotation.z = Math.PI / 2; bar.position.set(0, 16, 0);
         this.metaGroupMaster.add(postL, postR, bar);
 
-        const lightGeo = new THREE.SphereGeometry(0.55, 16, 16);
         this.redMat = new THREE.MeshBasicMaterial({ color: 0x550000 });
         this.greenMat = new THREE.MeshBasicMaterial({ color: 0x005500 });
-        const lLight = new THREE.Mesh(lightGeo, this.redMat); lLight.position.set(-1.0, 16, 0.55);
-        const rLight = new THREE.Mesh(lightGeo, this.greenMat); rLight.position.set(1.0, 16, 0.55);
+        const lLight = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16), this.redMat); lLight.position.set(-1.0, 16, 0.55);
+        const rLight = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16), this.greenMat); rLight.position.set(1.0, 16, 0.55);
         this.metaGroupMaster.add(lLight, rLight);
 
         this.metaGroupMaster.rotation.y = this.metaAngle;
@@ -287,11 +331,34 @@ class Game {
 
     triggerSkill(car, slotIndex) {
         let skill = car.skills[slotIndex]; if (!skill || skill === "USADO") return;
+        
         if (skill === "BOOST") car.activateBoost();
         else if (skill === "SWAP") this.swapCarPositions();
         else if (skill === "FREEZE") this.cars[car.id === 1 ? 1 : 0].activateFreeze();
         else if (skill === "IMMUNE") car.activateImmunity();
+        else if (skill === "HOMING_MISSILE") this.fireHomingMissile(car);
+
         car.skills[slotIndex] = "USADO";
+    }
+
+    fireHomingMissile(owner) {
+        const target = owner.id === 1 ? this.cars[1] : this.cars[0];
+        
+        // Crear objeto visual del misil (Cilindro magenta/morado flotante)
+        const misGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 8);
+        misGeo.rotateX(Math.PI / 2);
+        const misMat = new THREE.MeshBasicMaterial({ color: 0x9b59b6 });
+        const misMesh = new THREE.Mesh(misGeo, misMat);
+        misMesh.position.set(owner.x, 1.5, owner.z);
+        this.scene.add(misMesh);
+
+        this.activeMissiles.push({
+            mesh: misMesh,
+            x: owner.x,
+            z: owner.z,
+            target: target,
+            speed: 1.1 // El misil vuela más rápido que los coches base
+        });
     }
 
     swapCarPositions() {
@@ -313,7 +380,9 @@ class Game {
     }
 
     update() {
+        // Rotación y parpadeo estético de trampas fijas
         this.surpriseBoxes.forEach(b => { if (!b.triggered && b.mesh) b.mesh.rotation.y += 0.02; });
+        this.explosiveMines.forEach(m => { if (!m.triggered && m.mesh) m.mesh.scale.setScalar(1 + Math.sin(Date.now() * 0.01)*0.15); });
 
         if (this.globalMatchFrozen) {
             if (this.cars[0]) this.cars[0].update(null);
@@ -323,6 +392,7 @@ class Game {
             if (this.cars[1]) this.cars[1].update(this.input.getPlayer2Input());
         }
 
+        this.updateHomingMissiles(); // <-- NUEVO: Cálculo vectorial de persecución de misiles
         this.processTrackCollisions();
         this.processCarCollisions();
         this.processHazardCollisions(); 
@@ -334,8 +404,39 @@ class Game {
         if (this.cars[1]) this.previousCarPositions[1] = { x: this.cars[1].x, z: this.cars[1].z };
     }
 
+    updateHomingMissiles() {
+        for (let i = this.activeMissiles.length - 1; i >= 0; i--) {
+            const m = this.activeMissiles[i];
+            
+            // Calcular vector de dirección hacia el coche objetivo
+            const dx = m.target.x - m.x;
+            const dz = m.target.z - m.z;
+            const dist = Math.sqrt(dx*dx + dz*dz);
+
+            if (dist < 3.0) { // Colisión directa del misil
+                if (!m.target.isImmune) {
+                    m.target.launchIntoAir(1.1); // Lo manda a volar
+                    m.target.explosionTimer = 90; // Paralizado por impacto 1.5s
+                }
+                this.scene.remove(m.mesh);
+                this.activeMissiles.splice(i, 1);
+                continue;
+            }
+
+            // Desplazamiento y orientación inteligente hacia el rival
+            const dirX = dx / dist;
+            const dirZ = dz / dist;
+            m.x += dirX * m.speed;
+            m.z += dirZ * m.speed;
+
+            m.mesh.position.set(m.x, 1.5, m.z);
+            m.mesh.rotation.y = Math.atan2(dirX, dirZ) + Math.PI;
+        }
+    }
+
     processTrackCollisions() {
         this.cars.forEach(car => {
+            if (car.y > 0.5) return; // Si va volando alto por una rampa, ignora colisión de bordes de pista
             const carPos = new THREE.Vector3(car.x, 0, car.z);
             const closestPoint = this.getClosestPoint(carPos, this.trackCurve);
             if (carPos.distanceTo(closestPoint) > 21.5) {
@@ -348,60 +449,87 @@ class Game {
 
     processHazardCollisions() {
         this.cars.forEach(car => {
-            // --- DETONACIÓN DE CAJAS ---
-            this.surpriseBoxes.forEach(box => {
-                if (!box.triggered && Math.sqrt((car.x - box.x)**2 + (car.z - box.z)**2) < 3.5) {
-                    box.triggered = true; this.scene.remove(box.mesh);
-                    if (Math.random() > 0.5) {
-                        const wallGeo = new THREE.BoxGeometry(8, 3, 3);
-                        const wallMesh = new THREE.Mesh(wallGeo, new THREE.MeshLambertMaterial({ color: '#c0392b' }));
-                        wallMesh.position.set(box.x, 1.5, box.z); this.scene.add(wallMesh);
-                        this.walls.push({ mesh: wallMesh, x: box.x, z: box.z, halfW: 4, halfL: 1.5, active: true });
-                    } else {
-                        this.invisibleTraps.push({ x: box.x, z: box.z, radius: 7, name: "Aceite Sorpresa" });
-                    }
-                }
-            });
+            const isFlying = car.y > 0.8; // Bandera física de altura
 
-            // --- CHEQUEO DE ZONAS DE RALENTIZACIÓN (Visibles + Invisibles) ---
+            // --- A) DETECTAR RAMPAS DE SALTO ---
+            if (!isFlying) {
+                this.ramps.forEach(ramp => {
+                    if (Math.sqrt((car.x - ramp.x)**2 + (car.z - ramp.z)**2) < ramp.radius) {
+                        car.launchIntoAir(0.75); // Impulso vertical ascendente
+                    }
+                });
+            }
+
+            // --- B) DETECTAR TURBO MATS ---
+            if (!isFlying) {
+                this.turboMats.forEach(mat => {
+                    if (Math.sqrt((car.x - mat.x)**2 + (car.z - mat.z)**2) < 3.0) {
+                        car.turboTimer = Math.max(car.turboTimer, 60); // 1 segundo inyección turbo
+                    }
+                });
+            }
+
+            // --- C) DETECTAR MINAS EXPLOSIVAS ---
+            if (!isFlying && !car.isImmune) {
+                this.explosiveMines.forEach(mine => {
+                    if (!mine.triggered && Math.sqrt((car.x - mine.x)**2 + (car.z - mine.z)**2) < 2.5) {
+                        mine.triggered = true;
+                        this.scene.remove(mine.mesh);
+                        car.launchIntoAir(1.4); // Explosión vertical brutal
+                        car.explosionTimer = 60; // Queda inutilizado temporalmente
+                    }
+                });
+            }
+
+            // --- D) CAJAS SORPRESA ---
+            if (!isFlying) {
+                this.surpriseBoxes.forEach(box => {
+                    if (!box.triggered && Math.sqrt((car.x - box.x)**2 + (car.z - box.z)**2) < 3.5) {
+                        box.triggered = true; this.scene.remove(box.mesh);
+                        if (Math.random() > 0.5) {
+                            const wallGeo = new THREE.BoxGeometry(8, 3, 3);
+                            const wallMesh = new THREE.Mesh(wallGeo, new THREE.MeshLambertMaterial({ color: '#c0392b' }));
+                            wallMesh.position.set(box.x, 1.5, box.z); this.scene.add(wallMesh);
+                            this.walls.push({ mesh: wallMesh, x: box.x, z: box.z, halfW: 4, halfL: 1.5, active: true });
+                        } else {
+                            this.invisibleTraps.push({ x: box.x, z: box.z, radius: 7, name: "Aceite Sorpresa" });
+                        }
+                    }
+                });
+            }
+
+            // --- E) PRISIONEROS DE ARENA O ACEITE ---
             let inSlowZone = false;
             let trapDetectedName = "";
 
-            if (!car.isImmune) {
-                // 1. Revisar trampas normales de arena
+            if (!car.isImmune && !isFlying) {
                 for (let trap of this.traps) {
                     if (Math.sqrt((car.x - trap.x)**2 + (car.z - trap.z)**2) < trap.radius) {
-                        inSlowZone = true;
-                        break;
+                        inSlowZone = true; break;
                     }
                 }
-                // 2. Revisar trampas Invisibles de asfalto
                 for (let trap of this.invisibleTraps) {
                     if (Math.sqrt((car.x - trap.x)**2 + (car.z - trap.z)**2) < trap.radius) {
-                        inSlowZone = true;
-                        trapDetectedName = trap.name;
-                        break;
+                        inSlowZone = true; trapDetectedName = trap.name; break;
                     }
                 }
             }
 
-            // Gestionar avisos textuales en UI de la trampa invisible pisada
             if (trapDetectedName !== "") {
                 if (car.id === 1) this.p1Alert = `⚠️ ¡PISASTE: ${trapDetectedName}!`;
                 else this.p2Alert = `⚠️ ¡PISASTE: ${trapDetectedName}!`;
             } else {
-                if (car.id === 1) this.p1Alert = "";
-                else this.p2Alert = "";
+                if (car.id === 1) this.p1Alert = ""; else this.p2Alert = "";
             }
 
             if (inSlowZone) {
-                car.maxSpeed = car.baseMaxSpeed * 0.3; // Castigo de reducción
+                car.maxSpeed = car.baseMaxSpeed * 0.3; 
             } else if (car.maxSpeed < car.baseMaxSpeed * 1.5) { 
                 car.maxSpeed = car.baseMaxSpeed;
             }
 
-            // --- CHOQUE CON MUROS ---
-            if (!car.isImmune) { 
+            // --- F) COLISIÓN DE MUROS (Solo si no vuela por encima de ellos) ---
+            if (!car.isImmune && car.y < 2.0) { 
                 for (let wall of this.walls) {
                     if (wall.active && car.x > wall.x - wall.halfW - 1.0 && car.x < wall.x + wall.halfW + 1.0 &&
                         car.z > wall.z - wall.halfL - 1.5 && car.z < wall.z + wall.halfL + 1.5) {
@@ -423,6 +551,9 @@ class Game {
 
     processCarCollisions() {
         const c1 = this.cars[0]; const c2 = this.cars[1]; if (!c1 || !c2 || c1.isImmune || c2.isImmune) return;
+        // Evitar choques entre ellos si están a alturas radicalmente distintas (uno saltando)
+        if (Math.abs(c1.y - c2.y) > 2.0) return;
+
         const dist = Math.sqrt((c2.x - c1.x)**2 + (c2.z - c1.z)**2);
         if (dist < 2.2) {
             c1.bounce(); c2.bounce();
