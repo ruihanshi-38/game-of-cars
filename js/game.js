@@ -21,6 +21,9 @@ class Game {
         this.totalLaps = 5; 
         this.availableSkills = ["BOOST", "SWAP", "FREEZE", "WALL"];
 
+        // Variable para desactivar temporalmente el muro de meta tras un SWAP
+        this.ignoreMetaWallTemporarily = false;
+
         this.trackPoints = [
             new THREE.Vector3(0, 0, 40),      
             new THREE.Vector3(50, 0, 40),     
@@ -153,16 +156,11 @@ class Game {
     }
 
     initPlayers() {
-        // Dirección hacia adelante de la pista
         const forwardVector = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.metaAngle).normalize();
-        
-        // Vector lateral REAL (perpendicular al avance en el eje X-Z global)
         const sideVector = new THREE.Vector3(-forwardVector.z, 0, forwardVector.x).normalize();
 
-        // Retrocedemos 5 unidades de la línea de meta para dar espacio de salida
         const startLineCenter = this.metaCenter.clone().addScaledVector(forwardVector, -5);
 
-        // Desplazamiento lateral exacto en paralelo: J1 a la izquierda (-2.5) y J2 a la derecha (+2.5)
         const p1Pos = startLineCenter.clone().addScaledVector(sideVector, -2.5);
         const p2Pos = startLineCenter.clone().addScaledVector(sideVector, 2.5);
 
@@ -171,7 +169,6 @@ class Game {
             new Car(this.scene, p2Pos.x, p2Pos.z, 0x3498db, 2)   
         ];
 
-        // Orientación inicial alineada con la pista
         this.cars.forEach(car => car.angle = this.metaAngle + Math.PI);
 
         this.previousCarPositions[0] = { x: this.cars[0].x, z: this.cars[0].z };
@@ -194,13 +191,11 @@ class Game {
         window.addEventListener('keydown', (e) => {
             if (this.globalMatchFrozen) return;
 
-            // Jugador 1: Teclas K y L
             if (this.cars[0] && !this.cars[0].frozenBySkill) {
                 if (e.key === 'k' || e.key === 'K') this.triggerSkill(this.cars[0], 0);
                 if (e.key === 'l' || e.key === 'L') this.triggerSkill(this.cars[0], 1);
             }
 
-            // Jugador 2: Teclas 1 y 2 (Alfanuméricas de arriba)
             if (this.cars[1] && !this.cars[1].frozenBySkill) {
                 if (e.key === '1') this.triggerSkill(this.cars[1], 0);
                 if (e.key === '2') this.triggerSkill(this.cars[1], 1);
@@ -230,10 +225,19 @@ class Game {
         const c1 = this.cars[0]; const c2 = this.cars[1];
         if (!c1 || !c2) return;
 
+        // Activamos la bandera para ignorar la colisión del muro de meta
+        this.ignoreMetaWallTemporarily = true;
+
         const tempX = c1.x; const tempZ = c1.z; const tempAngle = c1.angle;
         c1.x = c2.x; c1.z = c2.z; c1.angle = c2.angle;
         c2.x = tempX; c2.z = tempZ; c2.angle = tempAngle;
+        
         c1.speed = 0; c2.speed = 0; 
+
+        // Medio segundo después, cuando los coches se han asentado, reactivamos el muro
+        setTimeout(() => {
+            this.ignoreMetaWallTemporarily = false;
+        }, 5000); 
     }
 
     start() { this.loop(); }
@@ -351,6 +355,7 @@ class Game {
             const localPos = new THREE.Vector3(car.x, 0, car.z).sub(this.metaCenter).applyAxisAngle(new THREE.Vector3(0, 1, 0), -this.metaAngle);
 
             if (Math.abs(localPos.x) < 11) {
+                // Sentido de marcha correcto: suma de vuelta
                 if (oldDist <= 0 && currentDist > 0) {
                     if (car.passedCheckpoint) {
                         car.passedCheckpoint = false;
@@ -364,11 +369,14 @@ class Game {
                     }
                 }
                 
+                // Muro físico de dirección contraria (Se desactiva temporalmente si se acaba de hacer SWAP)
                 if (oldDist >= 0 && currentDist < 0) {
-                    car.bounce();
-                    const correctSide = this.metaCenter.clone().addScaledVector(planeNormal, 0.5);
-                    car.x = correctSide.x;
-                    car.z = correctSide.z;
+                    if (!this.ignoreMetaWallTemporarily) {
+                        car.bounce();
+                        const correctSide = this.metaCenter.clone().addScaledVector(planeNormal, 0.5);
+                        car.x = correctSide.x;
+                        car.z = correctSide.z;
+                    }
                 }
             }
         });
