@@ -4,20 +4,20 @@ class Car {
         this.color = color;
         this.scene = scene;
 
-        // Posición tridimensional completa
+        // Posición tridimensional y físicas
         this.x = x;
-        this.y = 0; // Control de altura para saltos en rampas
+        this.y = 0; 
         this.z = z;
         this.angle = 0;
         this.speed = 0;
         this.verticalVelocity = 0;
         this.isGrounded = true;
 
-        // Modificadores de estado temporales
+        // Temporizadores de estados
         this.turboTimer = 0;
         this.explosionTimer = 0;
 
-        // --- AJUSTES DE MOVIMIENTO ---
+        // Ajustes de movimiento (Perspectiva de Pantalla)
         this.baseMaxSpeed = 0.65;    
         this.maxSpeed = this.baseMaxSpeed;
         this.acceleration = 0.045;
@@ -27,25 +27,23 @@ class Car {
         this.currentLap = 1;
         this.passedCheckpoint = false;
         
-        // Habilidades
+        // Habilidades e Inmunidad
         this.skills = []; 
         this.frozenBySkill = false;
-        
-        // Habilidad: Inmunidad
         this.isImmune = false;
         this.blinkInterval = null;
 
-        // --- MODELADO DETALLADO Y REALISTA DE FÓRMULA 1 ---
+        // --- MODELADO DETALLADO ESTILO FÓRMULA 1 ---
         this.mesh = new THREE.Group();
 
-        // 1. Chasis / Fondo plano (Monocoque)
+        // Fondo plano / Chasis base
         const chassisGeo = new THREE.BoxGeometry(1.6, 0.2, 3.4);
         const chassisMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
         const chassis = new THREE.Mesh(chassisGeo, chassisMat);
         chassis.position.y = 0.1;
         this.mesh.add(chassis);
 
-        // 2. Carrocería estilizada (Nariz cónica)
+        // Carrocería principal (Nariz estilizada)
         this.bodyMat = new THREE.MeshLambertMaterial({ color: color });
         const noseGeo = new THREE.ConeGeometry(0.5, 2.0, 16);
         noseGeo.rotateX(Math.PI / 2);
@@ -54,7 +52,7 @@ class Car {
         nose.scale.set(1, 0.6, 1);
         this.mesh.add(nose);
 
-        // Pontones laterales (Sidepods aerodinámicos)
+        // Pontones laterales aerodinámicos
         const podGeo = new THREE.BoxGeometry(0.3, 0.5, 1.4);
         const leftPod = new THREE.Mesh(podGeo, this.bodyMat);
         leftPod.position.set(-0.7, 0.35, 0.4);
@@ -62,7 +60,7 @@ class Car {
         rightPod.position.set(0.7, 0.35, 0.4);
         this.mesh.add(leftPod, rightPod);
 
-        // 3. Habitáculo de piloto (Cockpit con Halo protector)
+        // Cockpit con protección Halo
         const cabinGeo = new THREE.SphereGeometry(0.45, 16, 16);
         const cabinMat = new THREE.MeshLambertMaterial({ color: 0x050505 });
         const cabin = new THREE.Mesh(cabinGeo, cabinMat);
@@ -76,12 +74,13 @@ class Car {
         halo.rotation.x = -Math.PI / 6;
         this.mesh.add(halo);
 
-        // 4. Alerones de competición detallados
+        // Alerón Delantero
         const frontWingGeo = new THREE.BoxGeometry(2.2, 0.08, 0.4);
         const frontWing = new THREE.Mesh(frontWingGeo, chassisMat);
         frontWing.position.set(0, 0.15, -1.9);
         this.mesh.add(frontWing);
 
+        // Alerón Trasero con soportes
         const rearWingMainGeo = new THREE.BoxGeometry(2.0, 0.25, 0.5);
         const rearWing = new THREE.Mesh(rearWingMainGeo, this.bodyMat);
         rearWing.position.set(0, 0.9, 1.6);
@@ -92,12 +91,12 @@ class Car {
         const supR = new THREE.Mesh(supportGeo, chassisMat); supR.position.set(0.4, 0.6, 1.5);
         this.mesh.add(supL, supR);
 
-        // 5. Ruedas realistas con llantas metálicas
+        // Neumáticos anchos y llantas metalizadas
         const wheelMat = new THREE.MeshLambertMaterial({ color: 0x1c1c1c });
         const rimMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, roughness: 0.3, metalness: 0.8 });
         
         const frontWheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.45, 24);
-        const rearWheelGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.60, 24); // Traseras más anchas
+        const rearWheelGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.60, 24); 
         frontWheelGeo.rotateZ(Math.PI / 2);
         rearWheelGeo.rotateZ(Math.PI / 2);
 
@@ -105,10 +104,10 @@ class Car {
         rimGeo.rotateZ(Math.PI / 2);
 
         const wheelConfigs = [
-            { geo: frontWheelGeo, pos: [-0.95, 0.38, -1.1], front: true },
-            { geo: frontWheelGeo, pos: [0.95, 0.38, -1.1], front: true },
-            { geo: rearWheelGeo, pos: [-1.05, 0.44, 1.1], front: false },
-            { geo: rearWheelGeo, pos: [1.05, 0.44, 1.1], front: false }
+            { geo: frontWheelGeo, pos: [-0.95, 0.38, -1.1] },
+            { geo: frontWheelGeo, pos: [0.95, 0.38, -1.1] },
+            { geo: rearWheelGeo, pos: [-1.05, 0.44, 1.1] },
+            { geo: rearWheelGeo, pos: [1.05, 0.44, 1.1] }
         ];
 
         wheelConfigs.forEach(wConf => {
@@ -122,7 +121,7 @@ class Car {
             this.mesh.add(wGroup);
         });
 
-        // 6. Tubo de escape trasero con detalle cromado
+        // Tubo de escape cromado
         const exhaustGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 8);
         exhaustGeo.rotateX(Math.PI / 2);
         const exhaust = new THREE.Mesh(exhaustGeo, rimMat);
@@ -134,7 +133,6 @@ class Car {
     }
 
     update(input) {
-        // Reducir temporizadores activos
         if (this.turboTimer > 0) this.turboTimer--;
         if (this.explosionTimer > 0) {
             this.explosionTimer--;
@@ -151,12 +149,11 @@ class Car {
             return;
         }
 
-        // Configurar velocidad máxima adaptativa (Turbos vs Frenos)
         let currentMax = this.baseMaxSpeed;
         if (this.turboTimer > 0) {
             currentMax = this.baseMaxSpeed * 1.6; 
         } else if (this.maxSpeed < this.baseMaxSpeed) {
-            currentMax = this.maxSpeed; // Se respeta el freno de las trampas de arena/aceite
+            currentMax = this.maxSpeed; 
         }
 
         let moveX = 0;
@@ -192,13 +189,11 @@ class Car {
             }
         }
 
-        // Aplicar físicas de gravedad para el salto
         this.applyGravity();
 
         this.mesh.position.set(this.x, this.y, this.z);
         this.mesh.rotation.y = this.angle;
 
-        // Efecto visual de rotación en el aire si salta
         if (!this.isGrounded) {
             this.mesh.rotation.x = -this.verticalVelocity * 0.4;
         } else {
@@ -208,7 +203,7 @@ class Car {
 
     applyGravity() {
         if (!this.isGrounded) {
-            this.verticalVelocity -= 0.022; // Gravedad constante por ciclo
+            this.verticalVelocity -= 0.022; 
             this.y += this.verticalVelocity;
             
             if (this.y <= 0) {
@@ -231,7 +226,7 @@ class Car {
     }
 
     activateBoost() {
-        this.turboTimer = 180; // 3 segundos de turbo puro acumulable
+        this.turboTimer = 180; 
         this.bodyMat.color.setHex(0xf1c40f); 
         setTimeout(() => {
             if (!this.isImmune) this.bodyMat.color.setHex(this.color); 
