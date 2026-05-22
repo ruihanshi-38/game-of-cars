@@ -3,11 +3,22 @@ class InputHandler {
         this.keys = {};
 
         window.addEventListener('keydown', (e) => {
-            this.keys[e.key.toLowerCase()] = true;
+            const keyName = e.key.toLowerCase();
+            this.keys[keyName] = true;
+
+            // Evitar comportamiento por defecto del scroll de ventana al usar las flechas o espacio
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'spacebar'].includes(keyName)) {
+                e.preventDefault();
+            }
         });
 
         window.addEventListener('keyup', (e) => {
             this.keys[e.key.toLowerCase()] = false;
+        });
+
+        // Limpiar teclas al perder foco de ventana para evitar autos que aceleran solos
+        window.addEventListener('blur', () => {
+            this.keys = {};
         });
     }
 
