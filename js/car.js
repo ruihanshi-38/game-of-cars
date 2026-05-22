@@ -4,18 +4,27 @@ class Car {
         this.color = color;
         this.scene = scene;
 
-        // Posición y vectores
+        // Posición tridimensional completa
         this.x = x;
+        this.y = 0; 
         this.z = z;
         this.angle = 0;
         this.speed = 0;
+        this.verticalVelocity = 0;
+        this.isGrounded = true;
 
-        // --- AJUSTES DE MOVIMIENTO EN PERSPECTIVA DE PANTALLA ---
-        this.maxSpeed = 0.6;    
-        this.baseMaxSpeed = this.maxSpeed;
-        this.acceleration = 0.04;
-        this.friction = 0.02;
-        this.turnSpeed = 0.15; // Velocidad de rotación fluida hacia el objetivo
+        // Modificadores de estado temporales (Medidos en Frames a 60fps)
+        this.turboTimer = 0;
+        this.explosionTimer = 0;
+        this.freezeTimer = 0;
+        this.immunityTimer = 0;
+
+        // --- AJUSTES DE MOVIMIENTO ---
+        this.baseMaxSpeed = 0.65;    
+        this.maxSpeed = this.baseMaxSpeed;
+        this.acceleration = 0.045;
+        this.friction = 0.025;
+        this.turnSpeed = 0.16; 
 
         this.currentLap = 1;
         this.passedCheckpoint = false;
@@ -23,147 +32,240 @@ class Car {
         // Habilidades
         this.skills = []; 
         this.frozenBySkill = false;
-        
-        // Habilidad: Inmunidad
         this.isImmune = false;
-        this.blinkInterval = null;
 
-        // --- MODELADO DEL COCHE EN 3D ---
+        // --- MODELADO DETALLADO TIPO FÓRMULA 1 ---
         this.mesh = new THREE.Group();
 
-        const bodyGeo = new THREE.BoxGeometry(1.6, 0.6, 3.2);
-        this.bodyMat = new THREE.MeshLambertMaterial({ color: color });
-        const body = new THREE.Mesh(bodyGeo, this.bodyMat);
-        body.position.y = 0.4;
-        this.mesh.add(body);
+        // 1. Chasis / Fondo plano
+        const chassisGeo = new THREE.BoxGeometry(1.6, 0.2, 3.4);
+        const chassisMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+        const chassis = new THREE.Mesh(chassisGeo, chassisMat);
+        chassis.position.y = 0.1;
+        this.mesh.add(chassis);
 
-        const cabinGeo = new THREE.BoxGeometry(1.1, 0.5, 1.3);
-        const cabinMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+        // 2. Carrocería (Nariz cónica)
+        this.bodyMat = new THREE.MeshLambertMaterial({ color: color });
+        const noseGeo = new THREE.ConeGeometry(0.5, 2.0, 16);
+        noseGeo.rotateX(Math.PI / 2);
+        const nose = new THREE.Mesh(noseGeo, this.bodyMat);
+        nose.position.set(0, 0.3, -1.0);
+        nose.scale.set(1, 0.6, 1);
+        this.mesh.add(nose);
+
+        // Pontones laterales (Sidepods)
+        const podGeo = new THREE.BoxGeometry(0.3, 0.5, 1.4);
+        const leftPod = new THREE.Mesh(podGeo, this.bodyMat);
+        leftPod.position.set(-0.7, 0.35, 0.4);
+        const rightPod = new THREE.Mesh(podGeo, this.bodyMat);
+        rightPod.position.set(0.7, 0.35, 0.4);
+        this.mesh.add(leftPod, rightPod);
+
+        // 3. Cockpit y Halo protector
+        const cabinGeo = new THREE.SphereGeometry(0.45, 16, 16);
+        const cabinMat = new THREE.MeshLambertMaterial({ color: 0x050505 });
         const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-        cabin.position.set(0, 0.8, -0.1);
+        cabin.position.set(0, 0.5, 0.2);
+        cabin.scale.set(1, 0.8, 1.4);
         this.mesh.add(cabin);
 
-        const wingGeo = new THREE.BoxGeometry(2.0, 0.1, 0.5);
-        const wingMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-        const wing = new THREE.Mesh(wingGeo, wingMat);
-        wing.position.set(0, 0.9, 1.3);
-        this.mesh.add(wing);
+        const haloGeo = new THREE.TorusGeometry(0.3, 0.06, 8, 24, Math.PI);
+        const halo = new THREE.Mesh(haloGeo, chassisMat);
+        halo.position.set(0, 0.6, -0.1);
+        halo.rotation.x = -Math.PI / 6;
+        this.mesh.add(halo);
 
-        const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.4, 12);
-        const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
-        wheelGeo.rotateZ(Math.PI / 2);
+        // 4. Alerones de competición
+        const frontWingGeo = new THREE.BoxGeometry(2.2, 0.08, 0.4);
+        const frontWing = new THREE.Mesh(frontWingGeo, chassisMat);
+        frontWing.position.set(0, 0.15, -1.9);
+        this.mesh.add(frontWing);
 
-        const wheelPositions = [
-            [-0.9, 0.35, -1.0], [0.9, 0.35, -1.0],
-            [-0.9, 0.35, 1.0], [0.9, 0.35, 1.0]
+        const rearWingMainGeo = new THREE.BoxGeometry(2.0, 0.25, 0.5);
+        const rearWing = new THREE.Mesh(rearWingMainGeo, this.bodyMat);
+        rearWing.position.set(0, 0.9, 1.6);
+        this.mesh.add(rearWing);
+
+        const supportGeo = new THREE.BoxGeometry(0.1, 0.6, 0.3);
+        const supL = new THREE.Mesh(supportGeo, chassisMat); supL.position.set(-0.4, 0.6, 1.5);
+        const supR = new THREE.Mesh(supportGeo, chassisMat); supR.position.set(0.4, 0.6, 1.5);
+        this.mesh.add(supL, supR);
+
+        // 5. Ruedas realistas con llantas
+        const wheelMat = new THREE.MeshLambertMaterial({ color: 0x1c1c1c });
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xdcdde1, roughness: 0.3, metalness: 0.8 });
+        
+        const frontWheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.45, 24);
+        const rearWheelGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.60, 24); 
+        frontWheelGeo.rotateZ(Math.PI / 2);
+        rearWheelGeo.rotateZ(Math.PI / 2);
+
+        const rimGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.05, 12);
+        rimGeo.rotateZ(Math.PI / 2);
+
+        const wheelConfigs = [
+            { geo: frontWheelGeo, pos: [-0.95, 0.38, -1.1] },
+            { geo: frontWheelGeo, pos: [0.95, 0.38, -1.1] },
+            { geo: rearWheelGeo, pos: [-1.05, 0.44, 1.1] },
+            { geo: rearWheelGeo, pos: [1.05, 0.44, 1.1] }
         ];
 
-        wheelPositions.forEach(pos => {
-            const w = new THREE.Mesh(wheelGeo, wheelMat);
-            w.position.set(pos[0], pos[1], pos[2]);
-            this.mesh.add(w);
+        wheelConfigs.forEach(wConf => {
+            const wGroup = new THREE.Group();
+            const tire = new THREE.Mesh(wConf.geo, wheelMat);
+            const rimOut = new THREE.Mesh(rimGeo, rimMat);
+            rimOut.position.x = wConf.pos[0] > 0 ? 0.21 : -0.21;
+            
+            wGroup.add(tire, rimOut);
+            wGroup.position.set(wConf.pos[0], wConf.pos[1], wConf.pos[2]);
+            this.mesh.add(wGroup);
         });
 
-        this.mesh.position.set(this.x, 0, this.z);
+        // 6. Tubo de escape cromado
+        const exhaustGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 8);
+        exhaustGeo.rotateX(Math.PI / 2);
+        const exhaust = new THREE.Mesh(exhaustGeo, rimMat);
+        exhaust.position.set(0, 0.25, 1.7);
+        this.mesh.add(exhaust);
+
+        this.mesh.position.set(this.x, this.y, this.z);
         scene.add(this.mesh);
     }
 
     update(input) {
-        if (this.frozenBySkill) {
+        // Reducir temporizadores activos cuadro por cuadro
+        if (this.turboTimer > 0) this.turboTimer--;
+        
+        if (this.explosionTimer > 0) {
+            this.explosionTimer--;
             this.speed = 0;
-            this.mesh.position.set(this.x, 0, this.z);
+            this.applyGravity();
+            this.mesh.position.set(this.x, this.y, this.z);
             return;
         }
 
-        // Determinar vectores de dirección basados estrictamente en la pantalla (X y Z globales)
+        if (this.freezeTimer > 0) {
+            this.freezeTimer--;
+            this.frozenBySkill = true;
+            this.speed = 0;
+            this.applyGravity();
+            this.mesh.position.set(this.x, this.y, this.z);
+            this.updateVisualEffects();
+            return;
+        } else {
+            this.frozenBySkill = false;
+        }
+
+        if (this.immunityTimer > 0) {
+            this.immunityTimer--;
+            this.isImmune = true;
+        } else {
+            this.isImmune = false;
+        }
+
+        // Actualizar colores dinámicos evitando conflictos asíncronos
+        this.updateVisualEffects();
+
+        // Configurar velocidad máxima adaptativa
+        let currentMax = this.baseMaxSpeed;
+        if (this.turboTimer > 0) {
+            currentMax = this.baseMaxSpeed * 1.6; 
+        }
+
         let moveX = 0;
         let moveZ = 0;
 
         if (input) {
-            if (input.forward)  moveZ -= 1; // Hacia arriba en la pantalla (-Z)
-            if (input.backward) moveZ += 1; // Hacia abajo en la pantalla (+Z)
-            if (input.left)     moveX -= 1; // Hacia la izquierda (-X)
-            if (input.right)    moveX += 1; // Hacia la derecha (+X)
+            if (input.forward)  moveZ -= 1;
+            if (input.backward) moveZ += 1;
+            if (input.left)     moveX -= 1;
+            if (input.right)    moveX += 1;
         }
 
-        // Si hay alguna tecla pulsada
         if (moveX !== 0 || moveZ !== 0) {
-            // Calcular el ángulo objetivo al que debe mirar el coche
             const targetAngle = Math.atan2(moveX, moveZ) + Math.PI;
-
-            // Suavizar la rotación del coche hacia esa dirección
             let diff = targetAngle - this.angle;
             while (diff < -Math.PI) diff += Math.PI * 2;
             while (diff > Math.PI) diff -= Math.PI * 2;
             this.angle += diff * this.turnSpeed;
 
-            // Incrementar velocidad de traslación
             this.speed += this.acceleration;
-            if (this.speed > this.maxSpeed) this.speed = this.maxSpeed;
+            if (this.speed > currentMax) this.speed = currentMax;
 
-            // Mover el coche directamente en la dirección del joystick/teclas (normalizado)
             const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
             this.x += (moveX / length) * this.speed;
             this.z += (moveZ / length) * this.speed;
         } else {
-            // Aplicar fricción si no se pulsa nada
             this.speed -= this.friction;
             if (this.speed < 0) this.speed = 0;
 
-            // Avanzar inercialmente en la última dirección del ángulo actual
             if (this.speed > 0) {
                 this.x -= Math.sin(this.angle) * this.speed;
                 this.z -= Math.cos(this.angle) * this.speed;
             }
         }
 
-        this.mesh.position.set(this.x, 0, this.z);
+        this.applyGravity();
+
+        this.mesh.position.set(this.x, this.y, this.z);
         this.mesh.rotation.y = this.angle;
+
+        // Efecto visual de rotación en el aire si salta
+        if (!this.isGrounded) {
+            this.mesh.rotation.x = -this.verticalVelocity * 0.4;
+        } else {
+            this.mesh.rotation.x = 0;
+        }
+    }
+
+    updateVisualEffects() {
+        if (this.isImmune) {
+            // Parpadeo de inmunidad controlado por tiempo real sin romper otros hilos
+            const blink = Math.floor(Date.now() / 150) % 2 === 0;
+            this.bodyMat.color.setHex(blink ? 0xffffff : this.color);
+        } else if (this.frozenBySkill) {
+            this.bodyMat.color.setHex(0x34e7e4); // Color hielo cian
+        } else if (this.turboTimer > 0) {
+            this.bodyMat.color.setHex(0xf1c40f); // Oro turbo
+        } else {
+            this.bodyMat.color.setHex(this.color); // Color original
+        }
+    }
+
+    applyGravity() {
+        if (!this.isGrounded) {
+            this.verticalVelocity -= 0.022; 
+            this.y += this.verticalVelocity;
+            
+            if (this.y <= 0) {
+                this.y = 0;
+                this.verticalVelocity = 0;
+                this.isGrounded = true;
+            }
+        }
+    }
+
+    launchIntoAir(force) {
+        this.verticalVelocity = force;
+        this.isGrounded = false;
     }
 
     bounce() {
-        // Rebotar invirtiendo la inercia instantánea
         this.speed = -this.speed * 0.4;
-        this.x += Math.sin(this.angle) * this.speed * 2;
-        this.z += Math.cos(this.angle) * this.speed * 2;
+        this.x += Math.sin(this.angle) * this.speed * 2.5;
+        this.z += Math.cos(this.angle) * this.speed * 2.5;
     }
 
     activateBoost() {
-        this.maxSpeed = this.baseMaxSpeed * 2.0; 
-        this.speed = this.maxSpeed;
-        this.bodyMat.color.setHex(0xf1c40f); 
-
-        setTimeout(() => {
-            this.maxSpeed = this.baseMaxSpeed;
-            if (!this.isImmune) this.bodyMat.color.setHex(this.color); 
-        }, 5000);
+        this.turboTimer = 180; 
     }
 
     activateFreeze() {
         if (this.isImmune) return;
-
-        this.frozenBySkill = true;
-        this.bodyMat.color.setHex(0x34e7e4); 
-
-        setTimeout(() => {
-            this.frozenBySkill = false;
-            if (!this.isImmune) this.bodyMat.color.setHex(this.color);
-        }, 3000);
+        this.freezeTimer = 180; 
     }
 
     activateImmunity() {
-        this.isImmune = true;
-        
-        let visible = false;
-        this.blinkInterval = setInterval(() => {
-            visible = !visible;
-            this.bodyMat.color.setHex(visible ? 0xffffff : this.color);
-        }, 150); 
-
-        setTimeout(() => {
-            clearInterval(this.blinkInterval);
-            this.isImmune = false;
-            this.bodyMat.color.setHex(this.color); 
-        }, 5000);
+        this.immunityTimer = 300; 
     }
 }
