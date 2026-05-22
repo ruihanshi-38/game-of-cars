@@ -2,18 +2,16 @@ class InputHandler {
     constructor() {
         this.keys = {};
 
-        // Escuchar cuando se presiona una tecla
         window.addEventListener('keydown', (e) => {
             this.keys[e.key.toLowerCase()] = true;
         });
 
-        // Escuchar cuando se suelta una tecla
         window.addEventListener('keyup', (e) => {
             this.keys[e.key.toLowerCase()] = false;
         });
     }
 
-    // Controles Jugador 1 (Flechas del teclado)
+    // Jugador 1: Flechas de dirección
     getPlayer1Input() {
         return {
             forward:  this.keys['arrowup']    || this.keys['up'],
@@ -23,7 +21,7 @@ class InputHandler {
         };
     }
 
-    // Controles Jugador 2 (Teclas W, A, S, D)
+    // Jugador 2: Teclas W, A, S, D
     getPlayer2Input() {
         return {
             forward:  this.keys['w'],
