@@ -9,10 +9,6 @@ class Car {
         this.z = z;
         this.angle = 0;
         this.speed = 0;
-        
-        // Físicas complejas de salto en el eje Y
-        this.verticalVelocity = 0;
-        this.isGrounded = true;
 
         this.turboTimer = 0;
         this.freezeTimer = 0;
@@ -24,46 +20,32 @@ class Car {
         this.turnSpeed = 0.16; 
 
         this.currentLap = 1;
-        this.passedCheckpoint = false;
         this.skills = [];
 
-        // --- MODELADO DETALLADO ESTILO F1 ---
+        // --- MODELO F1 RECOLECTADO ---
         this.mesh = new THREE.Group();
         this.bodyMat = new THREE.MeshLambertMaterial({ color: color });
 
-        // Chasis principal inferior
         const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.2, 3.4), new THREE.MeshLambertMaterial({ color: 0x111111 }));
         chassis.position.y = 0.1;
         this.mesh.add(chassis);
 
-        // Alerón / Morro frontal apuntando hacia -Z
         const nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.0, 16), this.bodyMat);
         nose.rotateX(Math.PI / 2);
         nose.position.set(0, 0.3, -1.0);
-        nose.scale.set(1, 0.6, 1);
         this.mesh.add(nose);
 
-        // Cabina del piloto
         const cabin = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), new THREE.MeshLambertMaterial({ color: 0x050505 }));
         cabin.position.set(0, 0.5, 0.2);
-        cabin.scale.set(1, 0.8, 1.4);
         this.mesh.add(cabin);
 
-        // Neumáticos de competición independientes
         const wheelMat = new THREE.MeshLambertMaterial({ color: 0x1c1c1c });
-        const frontWheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.45, 16).rotateZ(Math.PI / 2);
-        const rearWheelGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.60, 16).rotateZ(Math.PI / 2); 
-
-        const positions = [
-            { geo: frontWheelGeo, pos: [-0.95, 0.38, -1.1] },
-            { geo: frontWheelGeo, pos: [0.95, 0.38, -1.1] },
-            { geo: rearWheelGeo, pos: [-1.05, 0.44, 1.1] },
-            { geo: rearWheelGeo, pos: [1.05, 0.44, 1.1] }
-        ];
-
-        positions.forEach(w => {
-            const tire = new THREE.Mesh(w.geo, wheelMat);
-            tire.position.set(w.pos[0], w.pos[1], w.pos[2]);
+        const wGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 12).rotateZ(Math.PI / 2);
+        
+        const positions = [[-0.95, 0.4, -1.1], [0.95, 0.4, -1.1], [-1.05, 0.4, 1.1], [1.05, 0.4, 1.1]];
+        positions.forEach(pos => {
+            const tire = new THREE.Mesh(wGeo, wheelMat);
+            tire.position.set(pos[0], pos[1], pos[2]);
             this.mesh.add(tire);
         });
 
@@ -72,21 +54,19 @@ class Car {
     }
 
     update(input) {
-        // Reducción de estados de alteración
         if (this.turboTimer > 0) this.turboTimer--;
         if (this.freezeTimer > 0) {
             this.freezeTimer--;
             this.speed = 0;
-            this.applyGravity();
             return;
         }
 
         let currentMax = this.maxSpeed;
         if (this.turboTimer > 0) currentMax = this.baseMaxSpeed * 1.6;
 
-        let moveX = 0;
+        let moveX = 0; 
         let moveZ = 0;
-
+        
         if (input) {
             if (input.forward)  moveZ -= 1;
             if (input.backward) moveZ += 1;
@@ -116,26 +96,8 @@ class Car {
             }
         }
 
-        this.applyGravity();
         this.mesh.position.set(this.x, this.y, this.z);
         this.mesh.rotation.y = this.angle;
-    }
-
-    applyGravity() {
-        if (!this.isGrounded) {
-            this.verticalVelocity -= 0.05; // Gravedad simulada
-            this.y += this.verticalVelocity;
-            if (this.y <= 0) {
-                this.y = 0;
-                this.verticalVelocity = 0;
-                this.isGrounded = true;
-            }
-        }
-    }
-
-    launchIntoAir(force) {
-        this.verticalVelocity = force;
-        this.isGrounded = false;
     }
 
     bounce() {
@@ -146,13 +108,13 @@ class Car {
 
     activateBoost() {
         this.turboTimer = 120;
-        this.bodyMat.color.setHex(0xf1c40f); // Color dorado turbo
+        this.bodyMat.color.setHex(0xf1c40f);
         setTimeout(() => this.bodyMat.color.setHex(this.color), 2000);
     }
 
     activateFreeze() {
         this.freezeTimer = 100;
-        this.bodyMat.color.setHex(0x34e7e4); // Color cian congelado
+        this.bodyMat.color.setHex(0x34e7e4);
         setTimeout(() => this.bodyMat.color.setHex(this.color), 2000);
     }
 }
